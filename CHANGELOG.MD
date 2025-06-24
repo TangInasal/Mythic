@@ -4,6 +4,305 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1-rc78] - 2025-06-23
+
+### Changed
+
+- Added `payload_id` and `callback_id` as options for tags
+- Added `supports_multiple_c2_in_build` and `supports_multiple_c2_instances_in_build` database fields for Payload Types
+  - This is prepping for a future update to allow Payload Types to identify if they support multiple c2 to be selected at build
+
+## [3.3.1-rc77] - 2025-06-19
+
+### Changed
+
+- Updated the database to track if a task wants to reprocess with a new command or the original command
+  - This was originally updated for `Command Augmentation` containers to allow proper tracking for when
+    - the `CommandName` was changed for a new `CommandPayloadType`, but this also resulted in every time the
+    - `CommandName` was changed in tasking that the processing would continue under the new command, which isn't always ideal
+  - Now, only if you set `response.ReprocessAtNewCommandPayloadType` will the processing change to the new `CommandName`
+    - This means that CommandA that sets its `response.CommandName = commandB` and does a `process_response` field will have the message processed at `CommandA` still
+    - Setting the above AND `response.ReprocessAtNewCommandPayloadType` will have the `process_response` processed at `commandB` (specify the same payload type name is ok too)
+    
+## [3.3.1-rc76] - 2025-06-18
+
+### Changed
+
+- Updated processing for agent messages to support new MythicRPCHandleAgentJson function
+  - This allows developers to hook into more "standard" agent message processing from MythicRPC locations
+- Updated bulk downloading to force host if none exists ("UNKNOWN") and removes trailing "." if no file extension exists
+- Fixed an issue where sometimes a callback on checking in after getting hidden wouldn't re-appear in the active table
+
+## [3.3.1-rc75] - 2025-06-11
+
+### Changed
+
+- Updated the processing of completion handlers for tasks to better account script only and child tasks
+- Added `cwd` and `impersonation_context` to callbacks as part of their `checkin` and update messages
+- Added new `callback` field to agent response dictionary
+  - this field allows you to update any fields that you'd normally set in your `checkin` message
+- Added new field to tasks, `CommandParameterType`, to better track where processing should go if a task sets a new PayloadType as part of its processing
+  - An example would be `forge` updating the command name and container where processing should continue - this new payload type is also tracked
+- Updated health check code for database to properly report success
+
+## [3.3.1-rc74] - 2025-06-09
+
+### Changed
+
+- Updated the processing of commands for building payloads to include `dependencies` in a command's attributes
+  - if `command1` is a dependency for `command2`, and the user selected command2 but not command1 when building,
+    - then mythic will automatically add `command1` to the list of commands that need to be built into the agent
+  - an example would be `dependencies = ["command1"]`
+
+## [3.3.1-rc73] - 2025-06-04
+
+### Changed
+
+- Updated the UI to allow creation of new Artifacts (that aren't tied to specific tasks)
+- Updated payload updating information to a new GraphQL Action for:
+  - description, callback_alert, delete, and callback_allowed
+  - New data tracked for callback_allowed to optionally prevent new callbacks from payloads
+- Updated Artifact processing
+  - Reporting an artifact will result in getting back an `id` for the artifact
+  - That `id` can then be sent in future artifact messages to update its `needs_cleanup` and `resolved` status
+- Payloads now have a `callback_allowed` attribute
+  - this is `true` by default, but setting it to false (toggling in the UI on the payloads page or callback metadata) will prevent future new callbacks from that payload
+  - this feature was "implicitly" there when you delete a payload, but that is removed in favor of this new method
+  - A new UI element will show on the payload if it's not marked for allowing callbacks
+
+## [3.3.1-rc72] - 2025-6-03
+
+### Changed
+
+- Updated the MythicRPCCallbackUpdate call to allow no specifying C2 Profile when asking to update last checkin time
+
+## [3.3.1-rc71]- 2025-05-30
+
+### Changed
+
+- Updated `help` output to have `help` and `clear` alphabetically included
+- Adding regex checks for `help`, so you can do `help list.*` to find all commands that start with `list` that are loaded
+- File Uploads (Mythic -> Agent) now track and display chunks sent on the File Search page for Uploads
+- State of the vertical navbar (open/close) is saved in user preferences so it'll stay through refresh
+- Updated the "InviteLinks" UI button on the settings page to only be enabled if you're an admin and the feature is enabled
+- Updated UI and GraphQL to allow bulk file delete
+- Added new User Preference to hide browser-based tasking (file browser / process browser) from your normal tasking views
+- Updated file media viewer to dynamically update as more chunks for a file are received
+- Added a new `task:job_kill` supported UI feature that takes in a raw agent_task_id (uuid)
+  - This shows up as a `skull` icon for tasking that has been picked up by the agent but hasn't completed
+- Updated UI callback drag columns to match vertical navbar color
+  
+## [3.3.1-rc70] - 2025-05-22
+
+### Changed
+
+- Updated the onStart operator selection to require the bot's current operation id to be the target operation
+- Fixed a logic bug in remove callback_tokens
+
+## [3.3.1-rc69] - 2025-05-21
+
+### Changed
+
+- Updated the logic for automatic eventing ingestion to not check for files that don't exist
+
+## [3.3.1-rc68] - 2025-05-21
+
+### Changed
+
+- Updated the server to have the version baked-in instead of reading a file on disk
+
+## [3.3.1-rc67] - 2025-05-19
+
+### Changed
+
+- Updated some processing of process data to update task_ids so that newer data gets updated in the UI
+
+## [3.3.1-rc66] - 2025-05-14
+
+### Changed
+
+- Fixed a bug with processing a built payload's updated command list
+- 
+## [3.3.1-rc65] - 2025-05-11
+
+### Changed
+
+- Fixed a bug with credential searching via MythicRPC
+- Updated healthcheck to include details about all installed services
+- Fixed issue in apitoken create for tasks
+- Updated post response token action to be "add" if none specified
+- Updated callbackToken action to be "add" if none specified
+- Updated command action to be "add" if none specified
+- Updated README sponsors
+
+## [3.3.1-rc64] - 2025-04-15
+
+### Changed
+
+- Updated the payload build process to not double trigger c2 profile start
+- Updated the logging for payload builds to be when the payload is done instead of when it starts
+
+## [3.3.1-rc63] - 2025-04-10
+
+### Changed
+
+- Updated reporting backend to trim spaces on comma separated exclusion filters
+
+## [3.3.1-rc62] - 2025-04-08
+
+### Changed
+
+- Updated the processing of timestamped for linked callbacks to not update nested relationships with egress connections
+- Updated mythictree update/delete to update the associated task_id as well to trigger updates in the UI
+- Added an `ORDER BY id DESC` for most MythicRPC Search calls
+
+## [3.3.1-rc61] - 2025-04-07
+
+### Changed
+
+- Updated the socks bind to explicitly bind to IPv4 addresses
+
+## [3.3.1-rc60] - 2025-04-04
+
+### Changed
+
+- Fixed typo in sql query
+
+## [3.3.1-rc59] - 2025-04-03
+
+### Changed
+
+- Fixed an issue with the tag get or create rpc call's sqlx IN processing
+
+## [3.3.1-rc58] - 2025-04-02
+
+### Changed
+
+- Fixed an issue with tag creation
+
+## [3.3.1-rc57] - 2025-04-01
+
+### Changed
+
+- Updated invite link checking to not count invite usage if the account wasn't created
+
+## [3.3.1-rc56] - 2025-03-28
+
+### Changed
+
+- Updated MythicRPCTaskSearch to allow specifying parent task to get all subtasks
+- Fixed bug in TagCreateWebhook
+- Added MythicRPCTagCreate
+- Added MythicRPCTagSearch
+- Added MythicRPCTagTypeGetOrCreate
+- Added new trigger - tag_create
+- Updated DynamicQueryFunction to take in OtherParameters - the names/values of other paramters in the task
+- If a command has `task_response:interactive` in its supported ui features, then Mythic will open up a new interactive component in the UI
+  - If that command ALSO has `task:process_interactive_tasks` in their supported ui, then these follow-on tasks will also go to that parent task's create tasking function first
+    - If you set this, you can check for this type of task:
+      - `taskData.Task.IsInteractiveTask` - boolean True or False
+      - `taskData.Task.InteractiveTaskType` - the type of input (normal input, ctrl characters, etc)
+        - There's an enum, `InteractiveTask` that can provide insight into what the int TaskTypes mean
+      - `taskData.Args.GetCommandLine()` - get what they actually typed
+      - `taskData.Args.SetManualArgs("new args\n")` - potentially update the input to something else (don't forget `\n` if you need it!)
+  - Otherwise, follow-on tasks in this new interactive component go directly to the agent
+
+## [3.3.1-rc55] - 2025-03-19
+
+### Changed
+
+- Updated processing of files in file browser for better handling of deleted files
+
+## [3.3.1-rc54] - 2025-03-14
+
+### Changed
+
+- Updated the response intercept function to not trigger on empty user outputs
+
+## [3.3.1-rc53] - 2025-03-13
+
+### Changed
+
+- Fixing struct tag for conditional eventing responses
+
+## [3.3.1-rc52] - 2025-03-12
+
+### Changed
+
+- Updated processing of `clear` and `help` in event logs to properly send the data through
+- Updated RPC timeout for RabbitMQ to 5s with 3 retries
+- Updated RabbitMQ retry loop to include redeclaring channels to help avoid rabbitmq locks
+
+## [3.3.1-rc51] - 2025-03-11
+
+### Changed
+
+- Updated the process of create tasking responses to allow arbitrary intermediate status values
+
+## [3.3.1-rc50] - 2025-03-07
+
+### Changed
+
+- Updated the FileSearch to not implicitly check for files with comments
+- Fixed an issue with task automation not properly returning the display_id for tasks
+
+## [3.3.1-rc49] - 2025-03-05
+
+### Changed
+
+- Updated the `size` field in `filemeta` to `bigint` instead of `int` for larger file size tracking
+- Added a timer to sync chunk counts every 5s
+
+## [3.3.1-rc48] - 2025-03-05
+
+### Changed
+
+- Updated the create tasking webhook to return sooner before sending to containers
+- Updated some of the rabbitmq connections with loops to be a bit more robust to errors
+- Updated some of the tasking status messages to try to be a bit more informative
+
+## [3.3.1-rc47] - 2025-02-26
+
+### Changed
+
+- Updated task output to support `stdout` and `stderr` fields in addition to `user_output`
+
+## [3.3.1-rc46] - 2025-02-21
+
+### Changed
+
+- Updated some rabbitmq processing to reduce deadlocks and return quicker from timeout delays to the UI
+
+## [3.3.1-rc45] - 2025-02-20
+
+### Changed
+
+- Updated rabbitmq with retries for failed tasks before aborting
+
+## [3.3.1-rc44] - 2025-02-18
+
+### Changed
+
+- Fixed a trailing comma in a SQL query that broke creating files based on payload uuid
+
+## [3.3.1-rc43] - 2025-02-14
+
+### Changed
+
+- Fixed a bug when downloading 0 byte files that would cause a crash when sending eventing notifications
+
+## [3.3.1-rc42] - 2025-02-10
+
+### Changed
+
+- Just reverting the rabbitmq tweaks since the queues aren't getting cleaned up properly
+
+## [3.3.1-rc41] - 2025-02-10
+
+### Changed
+
+- Few rabbitmq tweaks
+
 ## [3.3.1-rc40] - 2025-02-07
 
 ### Changed

@@ -24,6 +24,7 @@ import {UploadTaskFile} from '../../MythicComponents/MythicFileUpload';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BackupIcon from '@mui/icons-material/Backup';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 const fileMetaFragment = gql`
 fragment filemetaData on filemeta{
@@ -284,12 +285,12 @@ query commentFileMetaScreenshotQuery($operation_id: Int!, $comment: String!, $ho
 const tagFileMetaUploadSearch = gql`
 ${fileMetaFragment}
 query tagFileMetaUploadQuery($tag: String!, $host: String!, $offset: Int!, $fetchLimit: Int!, $deleted: Boolean!) {
-    tag_aggregate(distinct_on: id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, eventgroup_id: {_is_null: true},  is_download_from_agent: {_eq: false}, is_screenshot: {_eq: false}}}) {
+    tag_aggregate(distinct_on: filemeta_id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, eventgroup_id: {_is_null: true},  is_download_from_agent: {_eq: false}, is_screenshot: {_eq: false}}}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, eventgroup_id: {_is_null: true},  is_download_from_agent: {_eq: false}, is_screenshot: {_eq: false}}}) {
+    tag(limit: $fetchLimit, distinct_on: filemeta_id, offset: $offset, order_by: {filemeta_id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, eventgroup_id: {_is_null: true},  is_download_from_agent: {_eq: false}, is_screenshot: {_eq: false}}}) {
       filemetum{
         ...filemetaData
       }
@@ -299,12 +300,12 @@ query tagFileMetaUploadQuery($tag: String!, $host: String!, $offset: Int!, $fetc
 const tagFileMetaDownloadSearch = gql`
 ${fileMetaFragment}
 query tagFileMetaDownloadQuery($tag: String!, $host: String!, $offset: Int!, $fetchLimit: Int!, $deleted: Boolean!) {
-    tag_aggregate(distinct_on: id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_download_from_agent: {_eq: true}, is_screenshot: {_eq: false}}}) {
+    tag_aggregate(distinct_on: filemeta_id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_download_from_agent: {_eq: true}, is_screenshot: {_eq: false}}}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_download_from_agent: {_eq: true}, is_screenshot: {_eq: false}}}) {
+    tag(limit: $fetchLimit, distinct_on: filemeta_id, offset: $offset, order_by: {filemeta_id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_download_from_agent: {_eq: true}, is_screenshot: {_eq: false}}}) {
       filemetum {
         ...filemetaData
       }
@@ -315,12 +316,12 @@ query tagFileMetaDownloadQuery($tag: String!, $host: String!, $offset: Int!, $fe
 const tagFileBrowserSearch = gql`
 ${mythictreeFragment}
 query tagFileBrowserQuery($tag: String!, $host: String!, $offset: Int!, $fetchLimit: Int!, $deleted: Boolean!) {
-    tag_aggregate(distinct_on: id, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, deleted: {_eq: $deleted}, tree_type: {_eq: "file"}}}) {
+    tag_aggregate(distinct_on: mythictree_id, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, deleted: {_eq: $deleted}, tree_type: {_eq: "file"}}}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, deleted: {_eq: $deleted}, tree_type: {_eq: "file"}}}) {
+    tag(limit: $fetchLimit, distinct_on: mythictree_id, offset: $offset, order_by: {mythictree_id: desc}, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, deleted: {_eq: $deleted}, tree_type: {_eq: "file"}}}) {
       mythictree {
         ...mythictreeData
       }
@@ -331,12 +332,12 @@ query tagFileBrowserQuery($tag: String!, $host: String!, $offset: Int!, $fetchLi
 const tagFileMetaScreenshotSearch = gql`
 ${fileMetaFragment}
 query tagFileMetaScreenshotQuery($tag: String!, $host: String!, $offset: Int!, $fetchLimit: Int!, $deleted: Boolean!) {
-    tag_aggregate(distinct_on: id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_screenshot: {_eq: true}}}) {
+    tag_aggregate(distinct_on: filemeta_id, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_screenshot: {_eq: true}}}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_screenshot: {_eq: true}}}) {
+    tag(limit: $fetchLimit, distinct_on: filemeta_id, offset: $offset, order_by: {filemeta_id: desc}, where: {filemeta_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], filemetum: {host: {_ilike: $host}, deleted: {_eq: $deleted}, is_screenshot: {_eq: true}}}) {
       filemetum{
         ...filemetaData
       }
@@ -525,12 +526,12 @@ const SearchTabFilesSearchPanel = (props) => {
     }, [props.value, props.index]);
     return (
         <Grid container spacing={1} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <MythicTextField placeholder="Host Name Search..." value={searchHost}
                                  onChange={handleSearchHostValueChange} onEnter={submitSearch}
                                  name="Host Name Search..."/>
             </Grid>
-            <Grid item xs={3}>
+            <Grid size={3}>
                 <MythicTextField placeholder="Search..." value={search}
                                  onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..."
                                  InputProps={{
@@ -544,7 +545,7 @@ const SearchTabFilesSearchPanel = (props) => {
                                      style: {padding: 0}
                                  }}/>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Select
                     style={{marginBottom: "10px", width: "100%"}}
                     value={searchField}
@@ -557,7 +558,7 @@ const SearchTabFilesSearchPanel = (props) => {
                     }
                 </Select>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Select
                     style={{marginBottom: "10px", width: "100%"}}
                     value={searchLocation}
@@ -570,7 +571,7 @@ const SearchTabFilesSearchPanel = (props) => {
                     }
                 </Select>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Button variant="contained" color="primary" component="label" size={"small"} style={{marginRight: "5px"}} >
                     <BackupIcon style={{marginRight: "5px"}} /> Files
                     <input onChange={onFileChange} type="file" multiple hidden/>
@@ -719,105 +720,65 @@ export const SearchTabFilesPanel = (props) => {
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getfilenameFileMetaUploadSearch] = useLazyQuery(filenameFileMetaUploadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getfilenameFileMetaUploadSearch = useMythicLazyQuery(filenameFileMetaUploadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getfilenameFileMetaDownloadSearch] = useLazyQuery(filenameFileMetaDownloadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaDownloadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getfilenameFileMetaDownloadSearch = useMythicLazyQuery(filenameFileMetaDownloadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getfilenameFileBrowserSearch] = useLazyQuery(filenameFileBrowserSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileBrowserSearchResults,
-        onError: handleCallbackSearchFailure
+    const getfilenameFileBrowserSearch = useMythicLazyQuery(filenameFileBrowserSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getfilenameFileMetaScreenshotSearch] = useLazyQuery(filenameFileMetaScreenshotSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaScreenshotSearchResults,
-        onError: handleCallbackSearchFailure
+    const getfilenameFileMetaScreenshotSearch = useMythicLazyQuery(filenameFileMetaScreenshotSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getfilenameFileMetaEventingWorkflowSearch] = useLazyQuery(filenameFileMetaEventingWorkflowSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getfilenameFileMetaEventingWorkflowSearch = useMythicLazyQuery(filenameFileMetaEventingWorkflowSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gethashFileMetaUploadSearch] = useLazyQuery(hashFileMetaUploadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const gethashFileMetaUploadSearch = useMythicLazyQuery(hashFileMetaUploadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gethashFileMetaDownloadSearch] = useLazyQuery(hashFileMetaDownloadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaDownloadSearchResults,
-        onError: handleCallbackSearchFailure
+    const gethashFileMetaDownloadSearch = useMythicLazyQuery(hashFileMetaDownloadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gethashFileMetaScreenshotSearch] = useLazyQuery(hashFileMetaScreenshotSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaScreenshotSearchResults,
-        onError: handleCallbackSearchFailure
+    const gethashFileMetaScreenshotSearch = useMythicLazyQuery(hashFileMetaScreenshotSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getcommentFileMetaUploadSearch] = useLazyQuery(commentFileMetaUploadSearch, {
+    const getcommentFileMetaUploadSearch = useMythicLazyQuery(commentFileMetaUploadSearch, {
         fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
     })
-    const [getcommentFileMetaDownloadSearch] = useLazyQuery(commentFileMetaDownloadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaDownloadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getcommentFileMetaDownloadSearch = useMythicLazyQuery(commentFileMetaDownloadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getcommentFileBrowserSearch] = useLazyQuery(commentFileBrowserSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileBrowserSearchResults,
-        onError: handleCallbackSearchFailure
+    const getcommentFileBrowserSearch = useMythicLazyQuery(commentFileBrowserSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getcommentFileMetaScreenshotSearch] = useLazyQuery(commentFileMetaScreenshotSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaScreenshotSearchResults,
-        onError: handleCallbackSearchFailure
+    const getcommentFileMetaScreenshotSearch = useMythicLazyQuery(commentFileMetaScreenshotSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gettagFileMetaUploadSearch] = useLazyQuery(tagFileMetaUploadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const gettagFileMetaUploadSearch = useMythicLazyQuery(tagFileMetaUploadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gettagFileMetaDownloadSearch] = useLazyQuery(tagFileMetaDownloadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaDownloadSearchResults,
-        onError: handleCallbackSearchFailure
+    const gettagFileMetaDownloadSearch = useMythicLazyQuery(tagFileMetaDownloadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gettagFileBrowserSearch] = useLazyQuery(tagFileBrowserSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileBrowserSearchResults,
-        onError: handleCallbackSearchFailure
+    const gettagFileBrowserSearch = useMythicLazyQuery(tagFileBrowserSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [gettagFileMetaScreenshotSearch] = useLazyQuery(tagFileMetaScreenshotSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaScreenshotSearchResults,
-        onError: handleCallbackSearchFailure
+    const gettagFileMetaScreenshotSearch = useMythicLazyQuery(tagFileMetaScreenshotSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getUUIDFileMetaUploadSearch] = useLazyQuery(uuidFileMetaUploadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getUUIDFileMetaUploadSearch = useMythicLazyQuery(uuidFileMetaUploadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getUUIDFileMetaDownloadSearch] = useLazyQuery(uuidFileMetaDownloadSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaDownloadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getUUIDFileMetaDownloadSearch = useMythicLazyQuery(uuidFileMetaDownloadSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getUUIDFileMetaScreenshotSearch] = useLazyQuery(uuidFileMetaScreenshotSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaScreenshotSearchResults,
-        onError: handleCallbackSearchFailure
+    const getUUIDFileMetaScreenshotSearch = useMythicLazyQuery(uuidFileMetaScreenshotSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getUUIDFileMetaEventingWorkflowSearch] = useLazyQuery(uuidFileMetaEventingWorkflowSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleFileMetaUploadSearchResults,
-        onError: handleCallbackSearchFailure
+    const getUUIDFileMetaEventingWorkflowSearch = useMythicLazyQuery(uuidFileMetaEventingWorkflowSearch, {
+        fetchPolicy: "no-cache"
     })
     const onFilenameSearch = ({search, searchHost, offset, adjustedSearchLocation}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -833,7 +794,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileBrowserSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Uploads") {
             getfilenameFileMetaUploadSearch({
                 variables: {
@@ -844,7 +805,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Downloads") {
             getfilenameFileMetaDownloadSearch({
                 variables: {
@@ -855,7 +816,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaDownloadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Eventing Workflows"){
             getfilenameFileMetaEventingWorkflowSearch({
                 variables: {
@@ -864,7 +825,7 @@ export const SearchTabFilesPanel = (props) => {
                     filename: "%" + search + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else {
             getfilenameFileMetaScreenshotSearch({
                 variables: {
@@ -875,7 +836,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaScreenshotSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }
     }
     const onHashSearch = ({search, searchHost, offset, adjustedSearchLocation}) => {
@@ -900,7 +861,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Downloads") {
             gethashFileMetaDownloadSearch({
                 variables: {
@@ -911,7 +872,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaDownloadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else {
             gethashFileMetaScreenshotSearch({
                 variables: {
@@ -922,7 +883,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaScreenshotSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }
     }
     const onCommentSearch = ({search, searchHost, offset, adjustedSearchLocation}) => {
@@ -943,7 +904,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileBrowserSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Uploads") {
             getcommentFileMetaUploadSearch({
                 variables: {
@@ -954,7 +915,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Downloads") {
             getcommentFileMetaDownloadSearch({
                 variables: {
@@ -965,7 +926,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaDownloadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else {
             getcommentFileMetaScreenshotSearch({
                 variables: {
@@ -976,7 +937,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaScreenshotSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }
     }
     const onTagSearch = ({search, searchHost, offset, adjustedSearchLocation}) => {
@@ -996,7 +957,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileBrowserSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Uploads") {
             gettagFileMetaUploadSearch({
                 variables: {
@@ -1006,7 +967,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Downloads") {
             gettagFileMetaDownloadSearch({
                 variables: {
@@ -1016,7 +977,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaDownloadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else {
             gettagFileMetaScreenshotSearch({
                 variables: {
@@ -1026,7 +987,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaScreenshotSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }
     }
     const onUUIDSearch = ({search, searchHost, offset, adjustedSearchLocation}) => {
@@ -1051,7 +1012,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Downloads") {
             getUUIDFileMetaDownloadSearch({
                 variables: {
@@ -1062,7 +1023,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaDownloadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else if (adjustedSearchLocation === "Eventing Workflows") {
             getUUIDFileMetaEventingWorkflowSearch({
                 variables: {
@@ -1073,7 +1034,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaUploadSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         } else {
             getUUIDFileMetaScreenshotSearch({
                 variables: {
@@ -1084,7 +1045,7 @@ export const SearchTabFilesPanel = (props) => {
                     host: "%" + searchHost + "%",
                     deleted: showDeleted.current
                 }
-            })
+            }).then(({data}) => handleFileMetaScreenshotSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }
     }
     const onChangePage = (event, value) => {

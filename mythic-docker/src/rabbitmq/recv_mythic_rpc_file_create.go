@@ -104,6 +104,7 @@ func MythicRPCFileCreate(input MythicRPCFileCreateMessage) MythicRPCFileCreateMe
 		WHERE
 		task.id=$1`, input.TaskID)
 		if err != nil {
+			logging.LogError(err, "failed to fetch task")
 			response.Error = "Must supply a valid task ID"
 			return response
 		}
@@ -123,12 +124,13 @@ func MythicRPCFileCreate(input MythicRPCFileCreateMessage) MythicRPCFileCreateMe
 		payload := databaseStructs.Payload{}
 		err = database.DB.Get(&payload, `SELECT
 		payload.operator_id, 
-		payload.operation_id,
+		payload.operation_id
 		FROM
 		payload
 		WHERE
 		payload.uuid=$1`, input.PayloadUUID)
 		if err != nil {
+			logging.LogError(err, "failed to fetch payload uuid")
 			response.Error = "Must supply a valid payload UUID"
 			return response
 		}
@@ -154,6 +156,7 @@ func MythicRPCFileCreate(input MythicRPCFileCreateMessage) MythicRPCFileCreateMe
 		WHERE
 		callback.agent_callback_id=$1`, input.AgentCallbackID)
 		if err != nil {
+			logging.LogError(err, "failed to find agent callback id")
 			response.Error = "Must supply a valid agent callback id"
 			return response
 		}

@@ -100,15 +100,15 @@ func MythicRPCFileSearch(input MythicRPCFileSearchMessage) MythicRPCFileSearchMe
 		}
 	} else if input.OperationId == 0 {
 		response.Success = false
-		response.Error = "Must supply callbackID or operationID if not searching for a specific file"
+		response.Error = "Must supply TaskID, CallbackID or OperationID if not searching for a specific file by AgentFileID"
 		return response
 	} else {
 		operationId = input.OperationId
 		callbackId = 0
 	}
 	files := []databaseStructs.Filemeta{}
-	comment := "%_%"
-	filename := "%_%"
+	comment := "%%"
+	filename := "%%"
 	if input.Comment != "" && input.Comment != "*" {
 		comment = "%" + input.Comment + "%"
 	}

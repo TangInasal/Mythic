@@ -47,6 +47,9 @@ import {TagsDisplay, ViewEditTags} from "../../MythicComponents/MythicTag";
 import {MythicAgentSVGIcon} from "../../MythicComponents/MythicAgentSVGIcon";
 import SmartToyTwoToneIcon from '@mui/icons-material/SmartToyTwoTone';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import BlockIcon from '@mui/icons-material/Block';
+import NotificationsOffOutlinedIcon from '@mui/icons-material/NotificationsOffOutlined';
+import {EditPayloadConfigDialog} from "./EditPayloadConfigDialog";
 
 const rebuildPayloadMutation = gql`
 mutation triggerRebuildMutation($uuid: String!) {
@@ -58,7 +61,7 @@ mutation triggerRebuildMutation($uuid: String!) {
 }
 `;
 
-const exportPayloadConfigQuery = gql`
+export const exportPayloadConfigQuery = gql`
 query exportPayloadConfigQuery($uuid: String!) {
   exportPayloadConfig(uuid: $uuid) {
       status
@@ -81,6 +84,7 @@ export function PayloadsTableRow(props){
     const [openCreateNewCallbackDialog, setOpenCreateNewCallbackDialog] = React.useState(false);
     const [openGenerateIOCDialog, setOpenGenerateIOCDialog] = React.useState(false);
     const [openGenerateSampleMessageDialog, setOpenGenerateSampleMessageDialog] = React.useState(false);
+    const [openEditPayloadConfigDialog, setOpenEditPayloadConfigDialog] = React.useState(false);
     const dropdownAnchorRef = useRef(null);
     const [triggerRebuild] = useMutation(rebuildPayloadMutation, {
       onCompleted: (data) => {
@@ -125,13 +129,21 @@ export function PayloadsTableRow(props){
       }
     })
     const onAlertChanged = () => {
-        const {id, callback_alert} = props;
-        props.onAlertChanged(id, !callback_alert);
+        const {uuid: payload_uuid, callback_alert} = props;
+        props.onAlertChanged(payload_uuid, !callback_alert);
     }
     const onAcceptDelete = () => {
-        props.onDeletePayload(props.filemetum.id);
-        setOpenDeleteDialog(false);
+        if(props.deleted){
+            props.onRestorePayload(props.uuid);
+            setOpenDeleteDialog(false);
+        }else{
+            props.onDeletePayload(props.uuid);
+            setOpenDeleteDialog(false);
+        }
     }
+    const onCallbacksAllowedChanged = () =>[
+        props.onCallbacksAllowedChanged(props.uuid, !props.callback_allowed)
+    ]
     const handleMenuItemClick = (event, index) => {
         options[index].click();
         setOpenUpdateDialog(false);
@@ -143,22 +155,34 @@ export function PayloadsTableRow(props){
                      {name: <><DescriptionIcon color={"info"} style={{marginRight: "10px"}} />{'Edit Description'}</>, click: () => {
                         setOpenDescriptionDialog(true);
                      }},
+                    {name: <><InfoIconOutline color={"info"} style={{marginRight: "10px"}} /> View Payload Configuration</>, click: () => {
+                            setOpenDetailedView(true);
+                        }},
                      {name: props.callback_alert ?
-                             <><VisibilityIcon color={"success"} style={{marginRight: "10px"}}  />{'Stop Alerting to New Callbacks'}</> :
-                             <><VisibilityOffIcon color={"error"} style={{marginRight: "10px"}}  />{"Start Alerting to New Callbacks"}</>,
+                             <><VisibilityIcon color={"success"} style={{marginRight: "10px"}}  />{'Alerting to New Callbacks'}</> :
+                             <><VisibilityOffIcon color={"error"} style={{marginRight: "10px"}}  />{"Not Alerting to New Callbacks"}</>,
                          click: () => {
                         onAlertChanged();
                       }},
+                    {name: props.callback_allowed ?
+                            <><VisibilityIcon color={"success"} style={{marginRight: "10px"}}  />{'Allowing New Callbacks from this Payload'}</> :
+                            <><VisibilityOffIcon color={"error"} style={{marginRight: "10px"}}  />{"Preventing New Callbacks from this Payload"}</>,
+                        click: () => {
+                            onCallbacksAllowedChanged();
+                        }},
                      {name: <><MessageIcon style={{marginRight: "10px"}}  />{'View Build Message/Stdout'} </> , click: () => {
-                        setViewError(false);
+                         setViewError(false);
                         setOpenBuildMessageDialog(true);
-                     }},
-                     {name: <><ErrorIcon color={"error"} style={{marginRight: "10px"}}  />{'View Build Errors'}</>, click: () => {
-                        setViewError(true);
-                        setOpenBuildMessageDialog(true);
-                     }},
-                     {name: <><CachedIcon color={"success"} style={{marginRight: "10px"}} />{'Trigger New Build'}</>, click: () => {
+                    }},
+                    {name: <><ErrorIcon color={"error"} style={{marginRight: "10px"}}  />{'View Build Errors'}</>, click: () => {
+                       setViewError(true);
+                       setOpenBuildMessageDialog(true);
+                    }},
+                    {name: <><CachedIcon color={"success"} style={{marginRight: "10px"}} />{'Trigger New Build'}</>, click: () => {
                       triggerRebuild({variables: {uuid: props.uuid}});
+                    }},
+                    {name: <><CachedIcon color={"success"} style={{marginRight: "10px"}} />{'Trigger New Build With Edits'}</>, click: () => {
+                            setOpenEditPayloadConfigDialog(true);
                     }},
                     {name: <><IosShareIcon color={"info"} style={{marginRight: "10px"}} />{'Export Payload Config'}</>, click: () => {
                       exportConfig({variables: {uuid: props.uuid}});
@@ -175,9 +199,24 @@ export function PayloadsTableRow(props){
                     {name: <><BiotechIcon style={{marginRight: "10px"}} />{'Generate Sample Message'}</>, click: () => {
                         setOpenGenerateSampleMessageDialog(true);
                     }},
-                    {name: <><AddIcCallIcon color={"success"} style={{marginRight: "10px"}} />{'Generate Callback'}</>, click: () => {
+                    {name: <><AddIcCallIcon color={"success"} style={{marginRight: "10px"}} />{'Generate Fake Callback'}</>, click: () => {
                       setOpenCreateNewCallbackDialog(true);
-                    }}
+                    }},
+                    {name:<>
+                            {props.deleted ? (
+                                <>
+                                    <RestoreFromTrashIcon color={"success"} style={{marginRight: "10px"}} />
+                                    Restore Payload
+                                </>
+
+                            ) : (
+                                <React.Fragment>
+                                    <DeleteIcon color={"error"} style={{marginRight: "10px"}}/>
+                                    Delete the payload from disk
+                                </React.Fragment>
+                            )}</>, click: () => {
+                            setOpenDeleteDialog(true);
+                        }}
                      ]
     ;
     const handleClose = (event) => {
@@ -201,58 +240,40 @@ export function PayloadsTableRow(props){
         <React.Fragment>
             <TableRow key={"payload" + props.uuid} hover>
                 <MythicStyledTableCell>
-                  {props.deleted ? (
-                    <MythicStyledTooltip title={"Mark payload as not deleted so you can get callbacks, but does not recreate the payload on disk"}>
-                      <IconButton size="small" onClick={() => {props.onRestorePayload(props.id)}} color="success" variant="contained"><RestoreFromTrashIcon /></IconButton>
-                    </MythicStyledTooltip>
-                    
-                  ) : (
-                    <React.Fragment>
-                      <MythicStyledTooltip title={"Delete the payload from disk and mark as deleted. No new callbacks can be generated from this payload"}>
-                        <IconButton size="small" disableFocusRipple={true}
-                                    disableRipple={true} onClick={()=>{setOpenDeleteDialog(true);}} color="error" variant="contained"><DeleteIcon/></IconButton>
-                      </MythicStyledTooltip>
-                      
-                      {openDelete && 
-                        <MythicConfirmDialog onClose={() => {setOpenDeleteDialog(false);}} onSubmit={onAcceptDelete} open={openDelete}/>
-                      }
-                    </React.Fragment>
-                  )}
-                  
-                </MythicStyledTableCell>
-                <MythicStyledTableCell>
-                    <Button ref={dropdownAnchorRef} size="small" onClick={()=>{setOpenUpdateDialog(true);}} color="primary" variant="contained">
+                    <Button ref={dropdownAnchorRef} size="small" onClick={()=>{setOpenUpdateDialog(true);}} >
                         Actions <ArrowDropDownIcon />
                     </Button>
-                <Popper open={openUpdate} anchorEl={dropdownAnchorRef.current} role={undefined} transition disablePortal style={{zIndex: 4}}>
-                  {({ TransitionProps, placement }) => (
-                    <Grow
-                      {...TransitionProps}
-                      style={{
-                        transformOrigin: placement === 'bottom' ? 'center top' : 'center bottom',
-                      }}
-                    >
-                      <Paper className={"dropdownMenuColored"}>
-                        <ClickAwayListener onClickAway={handleClose} mouseEvent={"onMouseDown"}>
-                          <MenuList id="split-button-menu"  >
-                            {options.map((option, index) => (
-                              <MenuItem
-                                key={index + props.uuid}
-                                onClick={(event) => handleMenuItemClick(event, index)}
-                              >
-                                {option.name}
-                              </MenuItem>
-                            ))}
-                          </MenuList>
-                        </ClickAwayListener>
-                      </Paper>
-                    </Grow>
-                  )}
-                </Popper>
+                {openUpdate &&
+                    <Popper open={openUpdate} anchorEl={dropdownAnchorRef.current} role={undefined} transition disablePortal style={{zIndex: 4}}>
+              {({ TransitionProps, placement }) => (
+                <Grow
+                  {...TransitionProps}
+                  style={{
+                    transformOrigin: placement === 'bottom' ? 'center top' : 'center bottom',
+                  }}
+                >
+                  <Paper className={"dropdownMenuColored"}>
+                    <ClickAwayListener onClickAway={handleClose} mouseEvent={"onMouseDown"}>
+                      <MenuList id="split-button-menu"  >
+                        {options.map((option, index) => (
+                          <MenuItem
+                            key={index + props.uuid}
+                            onClick={(event) => handleMenuItemClick(event, index)}
+                          >
+                            {option.name}
+                          </MenuItem>
+                        ))}
+                      </MenuList>
+                    </ClickAwayListener>
+                  </Paper>
+                </Grow>
+              )}
+            </Popper>
+                }
                 {openDescription &&
                     <MythicDialog fullWidth={true} maxWidth="md" open={openDescription} 
                         onClose={()=>{setOpenDescriptionDialog(false);}} 
-                        innerDialog={<PayloadDescriptionDialog payload_id={props.id} onClose={()=>{setOpenDescriptionDialog(false);}} />}
+                        innerDialog={<PayloadDescriptionDialog payload_uuid={props.uuid} payload_id={props.id} onClose={()=>{setOpenDescriptionDialog(false);}} />}
                     />
                 }
                 {openFilename &&
@@ -298,18 +319,37 @@ export function PayloadsTableRow(props){
                       innerDialog={<CreateNewCallbackDialog uuid={props.uuid} filename={b64DecodeUnicode(props.filemetum.filename_text)} onClose={()=>{setOpenCreateNewCallbackDialog(false);}} />}
                   />
                 }
+                {openDelete &&
+                    <MythicConfirmDialog onClose={() => {setOpenDeleteDialog(false);}}
+                                         onSubmit={onAcceptDelete} open={openDelete}
+                    dialogText={!props.deleted? "Delete the payload from disk and mark as deleted. No new callbacks can be generated from this payload" :
+                    "Mark payload as not deleted so you can get callbacks, but does not recreate the payload on disk"}
+                    acceptText={props.deleted? "Restore" : "Remove"}
+                    acceptColor={props.deleted? "success": "error"}/>
+                }
                 </MythicStyledTableCell>
                 <MythicStyledTableCell>
-                  <PayloadsTableRowBuildProgress {...props} />
+                    <MythicStyledTooltip title={props.payloadtype.name} tooltipStyle={{display: "inline-block"}}>
+                        <MythicAgentSVGIcon payload_type={props.payloadtype.name} style={{width: "35px", height: "35px"}} />
+                    </MythicStyledTooltip>
+                    {!props.callback_allowed &&
+                        <MythicStyledTooltip title={"No new Callbacks allowed from this payload"}
+                                             tooltipStyle={{display: 'inline-block', position: "relative",
+                                                 top: "3px", left: "-10px", height: 0, width: 0
+                        }}>
+                            <BlockIcon fontSize={"small"} color={"error"} style={{backgroundColor: "white", borderRadius: "10px"}} />
+                        </MythicStyledTooltip>
+                    }
+                    {!props.callback_alert &&
+                        <MythicStyledTooltip title={"No Callback Alerts"}
+                                             tooltipStyle={{display: 'inline-block', position: "relative",
+                                                 top: "3px", left: "-45px", height: 0, width: 0
+                                             }}>
+                            <NotificationsOffOutlinedIcon fontSize={"small"} color={"error"} style={{backgroundColor: "white", borderRadius: "10px"}} />
+                        </MythicStyledTooltip>
+                    }
                 </MythicStyledTableCell>
-                <MythicStyledTableCell>
-                    <PayloadsTableRowBuildStatus {...props} />
-                </MythicStyledTableCell>
-                <MythicStyledTableCell>
-                    <ViewEditTags target_object={"filemeta_id"} target_object_id={props.filemetum.id} me={props.me} />
-                    <TagsDisplay tags={props.filemetum.tags} />
-                </MythicStyledTableCell>
-                <MythicStyledTableCell>
+                <MythicStyledTableCell style={{wordBreak: "break-all"}}>
                     {props.auto_generated && props.task &&
                         <MythicStyledTooltip title={"This payload was auto generated by a task"} >
                             <IconButton href={"/new/task/" + props?.task?.display_id} target={"_blank"} >
@@ -319,30 +359,32 @@ export function PayloadsTableRow(props){
                     }
                     {b64DecodeUnicode(props.filemetum.filename_text)}
                 </MythicStyledTableCell>
-                <MythicStyledTableCell>{props.description}</MythicStyledTableCell>
+                <MythicStyledTableCell>
+                        <PayloadsTableRowBuildStatus {...props} />
+                        <PayloadsTableRowBuildProgress {...props} />
+                </MythicStyledTableCell>
+                <MythicStyledTableCell style={{wordBreak: "break-all"}}>{props.description}</MythicStyledTableCell>
                 <MythicStyledTableCell>
                     <PayloadsTableRowC2Status payloadc2profiles={props.payloadc2profiles} uuid={props.uuid} />
                 </MythicStyledTableCell>
                 <MythicStyledTableCell>
-                  <MythicStyledTooltip title={props.payloadtype.name}>
-                      <MythicAgentSVGIcon payload_type={props.payloadtype.name} style={{width: "35px", height: "35px"}} />
-                  </MythicStyledTooltip>
-                </MythicStyledTableCell>
-                <MythicStyledTableCell>
-                    <IconButton disableFocusRipple={true}
-                                disableRipple={true} size="small" color="info" onClick={() => setOpenDetailedView(true)}>
-                        <InfoIconOutline />
-                    </IconButton>
+                    <ViewEditTags target_object={"payload_id"} target_object_id={props.id} me={props.me} />
+                    <TagsDisplay tags={props.filemetum.tags} />
+                    <TagsDisplay tags={props.tags} />
                 </MythicStyledTableCell>
             </TableRow>
-            <TableRow>
             {openDetailedView ? (
               <MythicDialog fullWidth={true} maxWidth="lg" open={openDetailedView} 
                   onClose={()=>{setOpenDetailedView(false);}} 
                   innerDialog={<DetailedPayloadTable {...props} payload_id={props.id} onClose={()=>{setOpenDetailedView(false);}} />}
               />
             ) : null }
-          </TableRow>
+            {openEditPayloadConfigDialog &&
+                <MythicDialog fullWidth={true} maxWidth="lg" open={openEditPayloadConfigDialog}
+                              onClose={()=>{setOpenEditPayloadConfigDialog(false);}}
+                              innerDialog={<EditPayloadConfigDialog uuid={props.uuid} onClose={()=>{setOpenEditPayloadConfigDialog(false);}} />}
+                />
+            }
         </React.Fragment>
       ) : null
     )

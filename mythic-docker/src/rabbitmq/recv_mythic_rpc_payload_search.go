@@ -91,6 +91,7 @@ func MythicRPCPayloadSearch(input MythicRPCPayloadSearchMessage) MythicRPCPayloa
 		FROM payload
 		JOIN payloadtype ON payload.payload_type_id = payloadtype.id
 		WHERE payload.operation_id=$1 AND payload.deleted=false AND payload.build_phase='success'
+		ORDER BY payload.id DESC
 		`, operationId)
 	if err != nil {
 		response.Error = err.Error()
@@ -109,7 +110,7 @@ func MythicRPCPayloadSearch(input MythicRPCPayloadSearchMessage) MythicRPCPayloa
 					// only care about checking if it's the right type
 					// now we need to try to find the matching build parameter to see if the value matches
 					for key, val := range buildRequirement.BuildParameterValues {
-						logging.LogInfo("searching build param values", "search key", key, "search val", val)
+						//logging.LogInfo("searching build param values", "search key", key, "search val", val)
 						buildParamInstance := databaseStructs.Buildparameterinstance{}
 						if err := database.DB.Get(&buildParamInstance, `
 								SELECT value,

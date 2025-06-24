@@ -14,6 +14,7 @@ import { Typography } from '@mui/material';
 import {TokenTable} from './TokenTable';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 const tokenFragment = gql`
 fragment tokenData on token{
@@ -134,7 +135,7 @@ const SearchTabTokensSearchPanel = (props) => {
     }, [props.value, props.index])
     return (
         <Grid container spacing={2} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={6}>
+            <Grid size={6}>
                 <MythicTextField placeholder="Search..." value={search}
                     onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..." InputProps={{
                         endAdornment: 
@@ -146,7 +147,7 @@ const SearchTabTokensSearchPanel = (props) => {
                         style: {padding: 0}
                     }}/>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Select
                     style={{marginBottom: "10px", width: "15rem"}}
                     value={searchField}
@@ -186,7 +187,7 @@ export const SearchTabTokensPanel = (props) =>{
                 break;
         }
     }
-    const handleTokenSearchResults = (data) => {
+    const handleSearchResults = (data) => {
         snackActions.dismiss();
         setTotalCount(data.token_aggregate.aggregate.count);
         setTokenData(data.token);
@@ -196,20 +197,14 @@ export const SearchTabTokensPanel = (props) =>{
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getUserGroupSearch] = useLazyQuery(userGroupSearch, {
-        fetchPolicy: "network-only",
-        onCompleted: handleTokenSearchResults,
-        onError: handleCallbackSearchFailure
+    const getUserGroupSearch = useMythicLazyQuery(userGroupSearch, {
+        fetchPolicy: "network-only"
     })
-    const [getSIDSearch] = useLazyQuery(SIDSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleTokenSearchResults,
-        onError: handleCallbackSearchFailure
+    const getSIDSearch = useMythicLazyQuery(SIDSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getHostSearch] = useLazyQuery(hostSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleTokenSearchResults,
-        onError: handleCallbackSearchFailure
+    const getHostSearch = useMythicLazyQuery(hostSearch, {
+        fetchPolicy: "no-cache"
     })
     const onUserGroupSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -223,7 +218,7 @@ export const SearchTabTokensPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             name: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onHostSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -237,7 +232,7 @@ export const SearchTabTokensPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             host: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onSIDSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -251,7 +246,7 @@ export const SearchTabTokensPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             sid: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onChangePage = (event, value) => {
         switch(searchField){

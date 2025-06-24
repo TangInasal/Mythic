@@ -31,6 +31,7 @@ type PayloadBuildMessage struct {
 type PayloadBuildC2Profile struct {
 	Name  string `json:"name"`
 	IsP2P bool   `json:"is_p2p"`
+	ID    int    `json:"id"`
 	// parameter name: parameter value
 	Parameters map[string]interface{} `json:"parameters"`
 }
@@ -77,7 +78,7 @@ func processPayloadBuildResponse(msg amqp.Delivery) {
 	databasePayload := databaseStructs.Payload{}
 	err = database.DB.Get(&databasePayload, `SELECT 
 			payload.build_message, payload.build_stderr, payload.build_stdout, payload.id, payload.build_phase,
-			payload.eventstepinstance_id, payload.operation_id, payload.operator_id,
+			payload.eventstepinstance_id, payload.operation_id, payload.operator_id, payload.payload_type_id,
 			filemeta.filename "filemeta.filename",
 			filemeta.id "filemeta.id"
 			FROM payload 
@@ -135,6 +136,7 @@ func processPayloadBuildResponse(msg amqp.Delivery) {
 		ActionStderr:        databasePayload.BuildStderr,
 	}
 	logging.LogDebug("Finished processing payload build response message")
+	go emitPayloadLog(databasePayload.ID)
 }
 
 func updateLoadedCommandsFromPayloadBuild(databasePayload databaseStructs.Payload, newCommandList *[]string) error {
@@ -189,13 +191,12 @@ func updateLoadedCommandsFromPayloadBuild(databasePayload databaseStructs.Payloa
 				FROM command
 				WHERE cmd=$1 and payload_type_id=$2
 				`, newCommand, databasePayload.PayloadTypeID); err != nil {
-					logging.LogError(err, "Failed to get command to associate with payload")
-					return err
+					logging.LogError(err, "Failed to get command to associate with payload", "command", newCommand)
 				} else {
 					// then insert the new mapping
 					payloadCommand := databaseStructs.Payloadcommand{
 						CommandID: databaseCommand.ID,
-						PayloadID: databasePayload.PayloadTypeID,
+						PayloadID: databasePayload.ID,
 						Version:   databaseCommand.Version,
 					}
 					if _, err := database.DB.NamedExec(`

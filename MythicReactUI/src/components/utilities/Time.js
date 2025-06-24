@@ -18,6 +18,35 @@ export function toLocalTime(date, view_utc) {
         return date + " UTC";
     }
 }
+function formatDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year} ` + date.toLocaleString(['en-us'], {hour12: false, hour: "2-digit", minute: "2-digit"});
+}
+export function toLocalTimeShort(date, view_utc) {
+    try {
+        if(date === null){
+            return "N/A";
+        }
+        let init_date = new Date(date);
+        if (view_utc) {
+            return formatDate(view_utc);
+        } else {
+            let timezoneDate = new Date(date + "Z");
+            return formatDate(timezoneDate);
+        }
+
+    } catch (error) {
+        console.log("warning", "Failed to get local time converted: " + error.toString());
+        return date + " UTC";
+    }
+}
 
 export function getTimeDifference(checkin_time, current_time) {
     let date = new Date();
@@ -74,5 +103,6 @@ export function useInterval(callback, delay, mountedRef, parentMountedRef) {
 }
 export function getSkewedNow() {
     let now = new Date();
-    return new Date(now.getTime() + (meState()?.user?.server_skew || 0) * 6000)
+    // meState()?.user?.server_skew is the number of millisecond difference
+    return new Date(now.getTime() + (meState()?.user?.server_skew || 0))
 }

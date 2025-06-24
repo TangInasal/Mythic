@@ -72,6 +72,19 @@ export function LoginForm(props){
             body: JSON.stringify({username, password})
         };
         fetch('/auth', requestOptions).then((response) => {
+            if(response.status === 403){
+                snackActions.warning("Invalid username or password");
+                return;
+            }else if(response.status === 404){
+                snackActions.warning("Failed to find login endpoint");
+                return;
+            }else if(response.status === 502){
+                snackActions.warning("Failed to contact mythic server due to gateway. Please refresh");
+                return;
+            }else if(response.status === 400){
+                snackActions.warning("Bad format, can't process request");
+                return;
+            }
             if(response.status !== 200){
                 snackActions.warning("HTTP " + response.status + " Error: Check Mythic logs");
                 return;
@@ -193,9 +206,9 @@ export function LoginForm(props){
                             {requestField.length === 0 &&
                                 <>
                                     <MythicTextField name='username' value={username} onChange={onUsernameChange}
-                                                     width={31}/>
-                                    <MythicTextField name='password' type="password" onEnter={submit} value={password}
-                                                     onChange={onPasswordChange} width={31}/>
+                                                     width={31} debounceDelay={0} showLabel={true} autoComplete={true}/>
+                                    <MythicTextField name='password' type="password" onEnter={submit} value={password} autoComplete={true}
+                                                     onChange={onPasswordChange} width={31} debounceDelay={0} showLabel={true}/>
                                     <Button type="submit" color="primary" onClick={submit} variant="contained"
                                             style={{}}>Login</Button>
                                 </>
@@ -205,7 +218,7 @@ export function LoginForm(props){
                                     {requestField.map(r => (
                                         <MythicTextField key={r.name} name={r.name} value={r.value} onChange={onUpdateText}
                                                          type={r.name === "password" ? "password" : ""}
-                                                         width={31}/>
+                                                         width={31} debounceDelay={0} showLabel={true}/>
                                     ))}
                                     <Button type="submit" color="primary" onClick={submitNonIDP} variant="contained"
                                             style={{}}>Login via {selectedAuthOptionRef.current.idp}</Button>

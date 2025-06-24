@@ -6,8 +6,6 @@ import {useTheme} from '@mui/material/styles';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ListIcon from '@mui/icons-material/List';
-import DeleteIcon from '@mui/icons-material/Delete';
-import GetAppIcon from '@mui/icons-material/GetApp';
 import { snackActions } from '../../utilities/Snackbar';
 import 'react-virtualized/styles.css';
 import MythicResizableGrid from '../../MythicComponents/MythicResizableGrid';
@@ -24,6 +22,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import {Dropdown, DropdownMenuItem, DropdownNestedMenuItem} from "../../MythicComponents/MythicNestedMenus";
 import {faSkullCrossbones, faSyringe, faKey,} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {GetComputedFontSize} from "../../MythicComponents/MythicSavedUserSetting";
 
 const getPermissionsDataQuery = gql`
     query getPermissionsQuery($mythictree_id: Int!) {
@@ -53,8 +52,8 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
     const [filterOptions, setFilterOptions] = React.useState({});
     const selectedColumn = React.useRef({});
     const [columnVisibility, setColumnVisibility] = React.useState({
-        "visible": ["Info","PID", "PPID", "Name", "User", "Arch", "CMD"],
-        "hidden": [ "Session", "Comment", "Tags" ]
+        "visible": ["Info","PID", "PPID", "Name",  "Arch", "Session", "User", "CMD"],
+        "hidden": [ "Comment", "Tags" ]
     })
     const [singleTreeData, setSingleTreeData] = React.useState({});
     const [viewSingleTreeData, setViewSingleTreeData] = React.useState(false);
@@ -108,9 +107,12 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
                         // check if key  is in children anywhere, if not, add it to adjustedMatrix[host][""][key] = 1
                         let found = false;
                         for(const [keySearch, childrenSearch] of Object.entries(matrix)){
-                            for(const [i, v] of Object.entries(childrenSearch)){
-                                if(i === key){found=true}
+                            if(childrenSearch.hasOwnProperty(key)){
+                                found=true;
                             }
+                            //for(const [i, v] of Object.entries(childrenSearch)){
+                            //    if(i === key){found=true}
+                            //}
                         }
                         if(!found){
                             if(adjustedMatrix[group][host][""] === undefined){adjustedMatrix[group][host][""] = {}}
@@ -118,13 +120,51 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
                         }
                     }
                 }
+                // check for loops in our adjusted matrix
+                for(const [key, _] of Object.entries(adjustedMatrix[group][host])){
+                    // key == 540
+                    // does anything have 540 has a child? 760 does - 760 is visited
+                    // does anything have 760 as a child? 676 does
+                    // does anything have 676 as a child? 540 does - X loop detected
+                    // let badKey = checkLoop(540, adjustedMatrix[group][host], [540]);
+                    let removeKey = checkLoop(adjustedMatrix[group][host], [key]);
+                    if(adjustedMatrix[group][host][removeKey]){
+                        delete adjustedMatrix[group][host][removeKey][key];
+                        adjustedMatrix[group][host][""][key] = 1;
+                    }
+                }
             }
         }
 
-        //console.log("adjustedMatrix", adjustedMatrix, "realMatrix", treeAdjMatrix)
+        console.log("adjustedMatrix", adjustedMatrix, "realMatrix", treeAdjMatrix)
         setUpdatedTreeAdjMatrix(adjustedMatrix);
-
     }, [treeAdjMatrix]);
+    const checkLoop = (nodes, visited) => {
+        let found = false;
+        let checkingKey = visited[visited.length-1]; // the latest thing we've seen
+        for(const [testKey, testNodes] of Object.entries(nodes)){
+            if(testNodes.hasOwnProperty(checkingKey)){
+                // we found a new node that has the last node we saw as a child
+                found = true;
+                //console.log("found", testNodes, "has", checkingKey, "visited", visited, "testKey", testKey)
+                if(visited.includes(testKey)){
+                    // we found a loop
+                    //console.log("found loop", visited, testKey)
+                    return true;
+                }
+                visited.push(testKey);
+                if(checkLoop(nodes, visited)){
+                    return visited.pop()
+                }
+            }
+        }
+        if(!found){
+            //console.log("didn't find", checkingKey, "in any edges")
+        } else {
+            //console.log("found nested, but no loop with", checkingKey)
+        }
+        return false;
+    }
     React.useEffect( () => {
         openAllNodes(true);
         setViewSingleTreeData(false);
@@ -157,12 +197,12 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
         { name: 'PID', type: 'number', key: 'process_id', inMetadata: true, width: 100},
         { name: 'PPID', type: 'number', key: 'parent_process_id', inMetadata: true, width: 100},
         { name: 'Name', type: 'string', disableSort: false, key: 'name_text', fillWidth: true },
+        { name: "Arch", type: 'string', key: 'architecture', inMetadata: true, width: 70},
+        { name: 'Session', type: 'number', key: 'session_id', inMetadata: true, width: 100},
         { name: "User", type: 'string', key: 'user', inMetadata: true, fillWidth: true},
-        { name: "Arch", type: 'string', key: 'architecture', inMetadata: true, width: 100},
         { name: 'Tags', type: 'tags', disableSort: true, disableFilterMenu: true, width: 220 },
         { name: 'Comment', type: 'string', key: 'comment', disableSort: false, width: 200 },
         { name: "CMD", type: "string", key: 'command_line', inMetadata: true, fillWidth: true},
-        { name: 'Session', type: 'number', key: 'session_id', inMetadata: true, width: 100}
     ];
     const columns = React.useMemo(
         () => 
@@ -567,6 +607,10 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
         {
             name: 'Filter Column', 
             click: ({event, columnIndex}) => {
+                if(event){
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
                 if(columns[columnIndex].disableFilterMenu){
                     snackActions.warning("Can't filter that column");
                     return;
@@ -578,6 +622,10 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
         {
             name: "Show/Hide Columns",
             click: ({event, columnIndex}) => {
+                if(event){
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
                 if(columns[columnIndex].disableFilterMenu){
                     snackActions.warning("Can't filter that column");
                     return;
@@ -607,7 +655,7 @@ export const CallbacksTabsProcessBrowserTable = ({treeAdjMatrix, treeRootData, m
                 sortIndicatorIndex={sortColumn}
                 sortDirection={sortData.sortDirection}
                 items={gridData}
-                rowHeight={20}
+                rowHeight={GetComputedFontSize() + 7}
                 onClickHeader={onClickHeader}
                 onDoubleClickRow={localOnDoubleClick}
                 contextMenuOptions={contextMenuOptions}
@@ -871,14 +919,14 @@ const FileBrowserTableRowActionCell = ({rowData, onTaskRowAction, treeRootData, 
     }
     async function getMenuOptions() {
         let options = [...optionsA];
-        options.push(...await optionsB(tabInfo["callbackID"], tabInfo["displayID"]));
+        options.push(...(await optionsB(tabInfo["callbackID"], tabInfo["displayID"])));
         if(treeRootData[host][rowData["full_path_text"] ]?.callback?.["id"] !== tabInfo["callbackID"]){
             options.push({
                 name: `Original Callback: ${treeRootData[host][rowData["full_path_text"] ]?.callback?.["id"]}`,
                 icon: null, click: () => {}, type: "menu",
                 menuItems: [
-                    ...await optionsB(treeRootData[host][rowData["full_path_text"] ]?.callback?.["id"],
-                        treeRootData[host][rowData["full_path_text"] ]?.callback?.display_id)
+                    ...(await optionsB(treeRootData[host][rowData["full_path_text"] ]?.callback?.["id"],
+                        treeRootData[host][rowData["full_path_text"] ]?.callback?.display_id))
                 ]
             })
         }
@@ -919,6 +967,7 @@ const FileBrowserTableRowActionCell = ({rowData, onTaskRowAction, treeRootData, 
                         isOpen={dropdownAnchorRef.current}
                         onOpen={setDropdownOpen}
                         externallyOpen={dropdownOpen}
+                        anchorReference={"anchorEl"}
                         menu={[
                             ...customMenuOptions.map((option, index) => (
                                 option.type === 'item' ? (

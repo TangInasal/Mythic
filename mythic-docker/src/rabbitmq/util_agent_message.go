@@ -75,8 +75,9 @@ type cachedUUIDInfo struct {
 	CallbackDisplayID            int `json:"callback_display_id" db:"display_id"`
 	OperationID                  int `json:"operation_id" db:"operation_id"`
 	// Active - tracking if the callback is active or not in a cached way
-	Active                    bool
-	TriggerOnCheckinAfterTime int `json:"trigger_on_checkin_after_time"`
+	Active                     bool
+	TriggerOnCheckinAfterTime  int  `json:"trigger_on_checkin_after_time"`
+	CallbackAllowedFromPayload bool `json:"callback_allowed_from_payload"`
 	// EdgeId - tracking the edge id for this callback to make sure it's updated as needed
 	EdgeId int
 }
@@ -206,7 +207,6 @@ func MarkCallbackInfoInactive(callbackID int) {
 		if cachedUUIDInfoMap[k].CallbackID == callbackID {
 			cachedUUIDInfoMap[k].Active = false
 			cachedUUIDInfoMap[k].EdgeId = 0
-			return
 		}
 	}
 }
@@ -216,6 +216,16 @@ func UpdateCallbackInfoTriggerOnCheckin(callbackID int, triggerOnCheckinAfterTim
 	for k, _ := range cachedUUIDInfoMap {
 		if cachedUUIDInfoMap[k].CallbackID == callbackID {
 			cachedUUIDInfoMap[k].TriggerOnCheckinAfterTime = triggerOnCheckinAfterTime
+			return
+		}
+	}
+}
+func UpdatePayloadInfoCallbackAllowed(payloadID int, callbackAllowed bool) {
+	cachedUUIDInfoMapMutex.Lock()
+	defer cachedUUIDInfoMapMutex.Unlock()
+	for k, _ := range cachedUUIDInfoMap {
+		if cachedUUIDInfoMap[k].PayloadID == payloadID && cachedUUIDInfoMap[k].UUIDType == UUIDTYPEPAYLOAD {
+			cachedUUIDInfoMap[k].CallbackAllowedFromPayload = callbackAllowed
 			return
 		}
 	}
@@ -282,6 +292,259 @@ func marshalMessageForAgentFormat(uuidInfo *cachedUUIDInfo, agentMessage map[str
 	return nil, errors.New("unknown message format for agent")
 }
 
+func processAgentMessageContent(agentMessageInput *AgentMessageRawInput, uuidInfo *cachedUUIDInfo, decryptedMessage map[string]interface{}, instanceResponse *recursiveProcessAgentMessageResponse) map[string]interface{} {
+	instanceResponse.OuterUuid = uuidInfo.UUID
+	var err error
+	response := make(map[string]interface{})
+	if _, ok := decryptedMessage["action"]; !ok {
+		errorMessage := fmt.Sprintf("Missing action in message:\n%s\n", decryptedMessage)
+		errorMessage += fmt.Sprintf("Connection from %s via %s\n", agentMessageInput.RemoteIP, agentMessageInput.C2Profile)
+		instanceResponse.Err = errors.New(errorMessage)
+		return response
+	}
+	if utils.MythicConfig.DebugAgentMessage {
+		if stringMsg, err := json.MarshalIndent(decryptedMessage, "", "  "); err != nil {
+			logging.LogError(err, "Failed to convert JSON to string for debug printing")
+		} else {
+			logging.LogDebug("Parsing agent message", "step 3", decryptedMessage)
+			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 3 (decrypted and parsed JSON): \n%s",
+				string(stringMsg)),
+				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_DEBUG)
+		}
+	}
+	delegateResponses := []delegateMessageResponse{}
+	getDelegateMessages := true // by default, we want to always get all delegate messages that are available
+	switch decryptedMessage["action"] {
+	case "checkin":
+		{
+			response, err = handleAgentMessageCheckin(&decryptedMessage, uuidInfo, agentMessageInput.RemoteIP)
+			if err == nil {
+				instanceResponse.NewCallbackUUID = response["id"].(string)
+				instanceResponse.OuterUuid = uuidInfo.UUID
+			}
+		}
+	case "get_tasking":
+		{
+			response, err = handleAgentMessageGetTasking(&decryptedMessage, uuidInfo.CallbackID)
+			instanceResponse.OuterUuid = uuidInfo.UUID // this is what our message UUID was coming into this parsing
+			if getDelegateTasks, ok := decryptedMessage["get_delegate_tasks"]; !ok || getDelegateTasks.(bool) {
+				// this means we should try to get some delegated tasks if they exist for our callback
+				delegateResponses = append(delegateResponses, getDelegateTaskMessages(uuidInfo.CallbackID, instanceResponse.AgentUUIDSize, agentMessageInput.UpdateCheckinTime)...)
+			} else {
+				// if the agent is doing a get_tasking and explicitly asking to not get delegate messages, then don't get any, even for proxy data
+				getDelegateMessages = false
+			}
+			delete(decryptedMessage, "get_delegate_tasks")
+		}
+	case "upload":
+		{
+			go SendAllOperationsMessage(fmt.Sprintf("Agent %s is using deprecated method of file transfer with the 'upload' action.", uuidInfo.PayloadTypeName),
+				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_DEBUG)
+			logging.LogError(nil, "deprecated form of upload detected, please update agent code to use new method")
+			response, err = handleAgentMessagePostResponse(&map[string]interface{}{
+				"action": "post_response",
+				"responses": []map[string]interface{}{
+					{
+						"task_id": decryptedMessage["task_id"],
+						"upload":  decryptedMessage,
+					},
+				},
+			}, uuidInfo)
+			uploadResponse := response["responses"].([]map[string]interface{})
+			response = uploadResponse[0]
+		}
+	case "post_response":
+		{
+			response, err = handleAgentMessagePostResponse(&decryptedMessage, uuidInfo)
+			instanceResponse.OuterUuid = uuidInfo.UUID // this is what our message UUID was coming into this parsing
+		}
+	case "update_info":
+		{
+			response, err = handleAgentMessageUpdateInfo(&decryptedMessage, uuidInfo, agentMessageInput.RemoteIP)
+			instanceResponse.OuterUuid = uuidInfo.UUID // this is what our message UUID was coming into this parsing
+		}
+	case "staging_rsa":
+		{
+			response, err = handleAgentMessageStagingRSA(&decryptedMessage, uuidInfo)
+			/*
+				if err == nil {
+					outerUUID = response["uuid"].(string)
+				}
+			*/
+		}
+	case "staging_translation":
+		{
+			finalBytes, err := handleAgentMessageStagingTranslation(&decryptedMessage, uuidInfo)
+			if err != nil {
+				logging.LogError(err, "Failed to handle translation staging function")
+				instanceResponse.Err = err
+				return response
+			}
+			instanceResponse.Message = *finalBytes
+			return response
+
+		}
+	default:
+		{
+			logging.LogError(nil, "Unknown action in message from agent", "action", decryptedMessage["action"])
+			err = errors.New("unknown action in message from agent")
+		}
+	}
+	if err != nil {
+		logging.LogError(err, "Failed to process message from Mythic")
+		instanceResponse.Err = err
+		return response
+	}
+	//logging.LogInfo("decrypted message after post response", "decrypted", decryptedMessage)
+	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_RESPONSES]; ok {
+		// this means we got response data outside the post_response key, so handle it
+		if postResponseMap, postResponseMapErr := handleAgentMessagePostResponse(&decryptedMessage, uuidInfo); postResponseMapErr != nil {
+			logging.LogError(err, "Failed to process 'responses' key in non-standard action")
+			response["status"] = "error"
+		} else {
+			for key, val := range postResponseMap {
+				response[key] = val
+			}
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_EDGES]; ok {
+		// this means we have some sort of add/remove announcement
+		edges := []agentMessagePostResponseEdges{}
+		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_EDGES], &edges); err != nil {
+			logging.LogError(err, "Failed to process out edge information")
+		} else {
+			go handleAgentMessagePostResponseEdges(uuidInfo, &edges)
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_DELEGATES]; ok {
+		// this means we have some delegate messages to process recursively
+		delegates := []delegateMessage{}
+		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_DELEGATES], &delegates); err != nil {
+			logging.LogError(err, "Failed to parse delegate messages")
+		} else {
+			for _, delegate := range delegates {
+				if utils.MythicConfig.DebugAgentMessage {
+					logging.LogDebug("Parsing agent message", "step 7", delegate)
+					SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 7 (delegate messages): \n%v", delegate),
+						uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_DEBUG)
+				}
+				currentDelegateMessage := AgentMessageRawInput{
+					C2Profile: delegate.C2ProfileName,
+					RemoteIP:  agentMessageInput.RemoteIP,
+				}
+				currentDelegateMessageBytes := []byte(delegate.Message)
+				currentDelegateMessage.Base64Message = &currentDelegateMessageBytes
+				if delegateResponse := recursiveProcessAgentMessage(&currentDelegateMessage); delegateResponse.Err != nil {
+					logging.LogError(delegateResponse.Err, "Failed to process delegate message")
+				} else {
+					newResponse := delegateMessageResponse{
+						Message:       string(delegateResponse.Message),
+						C2ProfileName: delegate.C2ProfileName,
+						SuppliedUuid:  delegate.SuppliedUuid,
+					}
+					if delegateResponse.NewCallbackUUID != "" && delegateResponse.NewCallbackUUID != delegate.SuppliedUuid {
+						newResponse.MythicUuid = delegateResponse.NewCallbackUUID
+						newResponse.NewUuid = delegateResponse.NewCallbackUUID
+						// we got an implicit new callback relationship, mark it
+						go callbackGraph.AddByAgentIds(instanceResponse.OuterUuid, delegateResponse.NewCallbackUUID, delegate.C2ProfileName)
+					} else {
+						if delegateResponse.OuterUuid != "" && delegateResponse.OuterUuid != delegate.SuppliedUuid {
+							newResponse.MythicUuid = delegateResponse.OuterUuid
+							newResponse.NewUuid = delegateResponse.OuterUuid
+						} else {
+							newResponse.SuppliedUuid = delegate.SuppliedUuid
+						}
+						go callbackGraph.AddByAgentIds(instanceResponse.OuterUuid, delegateResponse.OuterUuid, delegate.C2ProfileName)
+					}
+					//go callbackGraph.AddByAgentIds(outerUUID, delegateResponse.OuterUuid, delegate.C2ProfileName)
+					delegateResponses = append(delegateResponses, newResponse)
+				}
+			}
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_ALERTS]; ok {
+		alerts := []agentMessagePostResponseAlert{}
+		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_ALERTS], &alerts); err != nil {
+			logging.LogError(err, "Failed to parse alert messages")
+		} else {
+			go handleAgentMessagePostResponseAlerts(uuidInfo.OperationID, uuidInfo.CallbackID, uuidInfo.CallbackDisplayID, &alerts)
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_SOCKS]; ok {
+		socksMessages := []proxyFromAgentMessage{}
+		//logging.LogDebug("got socks data from agent", "data", decryptedMessage[CALLBACK_PORT_TYPE_SOCKS])
+		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_SOCKS], &socksMessages); err != nil {
+			logging.LogError(err, "Failed to convert agent socks message to proxyFromAgentMessage struct")
+		} else {
+			//logging.LogDebug("got socks data from agent mapped into struct", "data", socksMessages)
+			proxyPorts.SendDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_SOCKS, socksMessages)
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_RPORTFWD]; ok {
+		rpfwdMessages := []proxyFromAgentMessage{}
+		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_RPORTFWD], &rpfwdMessages); err != nil {
+			logging.LogError(err, "Failed to convert agent socks message to proxyFromAgentMessage struct")
+		} else {
+			//logging.LogDebug("got rpfwd data from agent mapped into struct", "data", socksMessages)
+			proxyPorts.SendDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_RPORTFWD, rpfwdMessages)
+		}
+	}
+	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_INTERACTIVE]; ok {
+		interactiveMessages := []agentMessagePostResponseInteractive{}
+		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_INTERACTIVE], &interactiveMessages); err != nil {
+			logging.LogError(err, "Failed to convert agent interactive message to agentMessagePostResponseInteractive")
+		} else {
+			proxyPorts.SendInteractiveDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_INTERACTIVE, interactiveMessages)
+		}
+	}
+	// regardless of the message type, get proxy data if it exists (for both socks and rpfwd)
+	if getDelegateMessages {
+		delegateResponses = append(delegateResponses, getDelegateProxyMessages(uuidInfo.CallbackID, instanceResponse.AgentUUIDSize, agentMessageInput.UpdateCheckinTime)...)
+	}
+	if len(delegateResponses) > 0 {
+		response["delegates"] = delegateResponses
+	}
+	// get first order proxy data not for delegate callbacks
+	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_SOCKS); err != nil {
+		logging.LogError(err, "Failed to get proxy data")
+	} else if proxyData != nil {
+		response[CALLBACK_PORT_TYPE_SOCKS] = proxyData
+	}
+	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_RPORTFWD); err != nil {
+		logging.LogError(err, "Failed to get proxy data")
+	} else if proxyData != nil {
+		response[CALLBACK_PORT_TYPE_RPORTFWD] = proxyData
+	}
+	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_INTERACTIVE); err != nil {
+		logging.LogError(err, "Failed to get interactive data")
+	} else if proxyData != nil {
+		response[CALLBACK_PORT_TYPE_INTERACTIVE] = proxyData
+	}
+	response["action"] = decryptedMessage["action"]
+	// reflect back any non-standard key at the top level
+	reflectBackOtherKeys(&response, &decryptedMessage)
+	// set this for push style c2 notifications
+	if uuidInfo.UUIDType == "callback" {
+		instanceResponse.OuterUuidIsCallback = true
+	}
+	if utils.MythicConfig.DebugAgentMessage {
+		if stringMsg, err := json.MarshalIndent(response, "", "  "); err != nil {
+			logging.LogError(err, "Failed to convert JSON to string for debug printing")
+		} else {
+			logging.LogDebug("Parsing agent message", "step final", response)
+			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step final (Response JSON): \n%s",
+				string(stringMsg)),
+				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_DEBUG)
+		}
+	}
+	if err != nil {
+		logging.LogError(err, "Failed to process agent message's action")
+		instanceResponse.Err = err
+		return response
+	}
+	return response
+}
+
 func recursiveProcessAgentMessage(agentMessageInput *AgentMessageRawInput) recursiveProcessAgentMessageResponse {
 	instanceResponse := recursiveProcessAgentMessageResponse{TrackingID: agentMessageInput.TrackingID}
 	var messageUUID uuid.UUID
@@ -293,11 +556,11 @@ func recursiveProcessAgentMessage(agentMessageInput *AgentMessageRawInput) recur
 		if agentMessageInput.Base64Message != nil {
 			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 1 (get data): \n%s",
 				string(*agentMessageInput.Base64Message)),
-				0, "debug", database.MESSAGE_LEVEL_INFO)
+				0, "debug", database.MESSAGE_LEVEL_DEBUG)
 		} else {
 			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 1 (get data): \n%s",
 				base64.StdEncoding.EncodeToString(*agentMessageInput.RawMessage)),
-				0, "debug", database.MESSAGE_LEVEL_INFO)
+				0, "debug", database.MESSAGE_LEVEL_DEBUG)
 		}
 
 	}
@@ -371,7 +634,7 @@ func recursiveProcessAgentMessage(agentMessageInput *AgentMessageRawInput) recur
 		logging.LogDebug("Processing agent message", "step 2", messageUUID.String())
 		SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 2 (get uuid): \n%s",
 			messageUUID.String()),
-			0, "debug", database.MESSAGE_LEVEL_INFO)
+			0, "debug", database.MESSAGE_LEVEL_DEBUG)
 	}
 	instanceResponse.AgentUUIDSize = agentUUIDLength
 	// 4. look up c2 profile and information about UUID
@@ -382,6 +645,21 @@ func recursiveProcessAgentMessage(agentMessageInput *AgentMessageRawInput) recur
 		go SendAllOperationsMessage(errorMessage, uuidInfo.OperationID, messageUUID.String(), database.MESSAGE_LEVEL_WARNING)
 		logging.LogError(err, errorMessage)
 		instanceResponse.Err = errors.New(errorMessage)
+		return instanceResponse
+	}
+	if !uuidInfo.CallbackAllowedFromPayload {
+		payload := databaseStructs.Payload{}
+		err = database.DB.Get(&payload, `SELECT
+			payload.description, 
+			filemeta.filename "filemeta.filename"
+			FROM payload
+			JOIN filemeta on payload.file_id = filemeta.id
+			WHERE payload.uuid=$1`, messageUUID.String())
+		errorMessage := fmt.Sprintf("Payload (%s) - %s\n", string(payload.Filemeta.Filename), payload.Description)
+		errorMessage += fmt.Sprintf("Registered as not allowing new callbacks, so messages are blocked. If this isn't intended, allow this from the payloads page.\n")
+		errorMessage += fmt.Sprintf("Connection from %s via %s\n", agentMessageInput.RemoteIP, agentMessageInput.C2Profile)
+		go SendAllOperationsMessage(errorMessage, uuidInfo.OperationID, messageUUID.String(), database.MESSAGE_LEVEL_WARNING)
+		instanceResponse.Err = err
 		return instanceResponse
 	}
 	decryptBytes := base64DecodedMessage[agentUUIDLength:totalBase64Bytes]
@@ -397,261 +675,20 @@ func recursiveProcessAgentMessage(agentMessageInput *AgentMessageRawInput) recur
 	}
 	// try to force the garbage collection on the base64 decoded message
 	base64DecodedMessage = make([]byte, 0)
-	if _, ok := decryptedMessage["action"]; !ok {
-		errorMessage := fmt.Sprintf("Missing action in message:\n%s\n", decryptedMessage)
-		errorMessage += fmt.Sprintf("Connection from %s via %s\n", agentMessageInput.RemoteIP, agentMessageInput.C2Profile)
-		instanceResponse.Err = errors.New(errorMessage)
+	response := processAgentMessageContent(agentMessageInput, uuidInfo, decryptedMessage, &instanceResponse)
+	if instanceResponse.Err != nil {
 		return instanceResponse
 	}
-	if utils.MythicConfig.DebugAgentMessage {
-		if stringMsg, err := json.MarshalIndent(decryptedMessage, "", "  "); err != nil {
-			logging.LogError(err, "Failed to convert JSON to string for debug printing")
-		} else {
-			logging.LogDebug("Parsing agent message", "step 3", decryptedMessage)
-			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 3 (decrypted and parsed JSON): \n%s",
-				string(stringMsg)),
-				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_INFO)
-		}
-	}
-	delegateResponses := []delegateMessageResponse{}
-	response := make(map[string]interface{})
-	outerUUID := uuidInfo.UUID  // UUID to use on the outside of the message, could update with staging/new callbacks
-	getDelegateMessages := true // by default, we want to always get all delegate messages that are available
-	switch decryptedMessage["action"] {
-	case "checkin":
-		{
-			response, err = handleAgentMessageCheckin(&decryptedMessage, uuidInfo, agentMessageInput.RemoteIP)
-			if err == nil {
-				instanceResponse.NewCallbackUUID = response["id"].(string)
-				instanceResponse.OuterUuid = outerUUID
-			}
-		}
-	case "get_tasking":
-		{
-			response, err = handleAgentMessageGetTasking(&decryptedMessage, uuidInfo.CallbackID)
-			instanceResponse.OuterUuid = outerUUID // this is what our message UUID was coming into this parsing
-			if getDelegateTasks, ok := decryptedMessage["get_delegate_tasks"]; !ok || getDelegateTasks.(bool) {
-				// this means we should try to get some delegated tasks if they exist for our callback
-				delegateResponses = append(delegateResponses, getDelegateTaskMessages(uuidInfo.CallbackID, agentUUIDLength, agentMessageInput.UpdateCheckinTime)...)
-			} else {
-				// if the agent is doing a get_tasking and explicitly asking to not get delegate messages, then don't get any, even for proxy data
-				getDelegateMessages = false
-			}
-			delete(decryptedMessage, "get_delegate_tasks")
-		}
-	case "upload":
-		{
-			go SendAllOperationsMessage(fmt.Sprintf("Agent %s is using deprecated method of file transfer with the 'upload' action.", uuidInfo.PayloadTypeName),
-				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_INFO)
-			logging.LogError(nil, "deprecated form of upload detected, please update agent code to use new method")
-			response, err = handleAgentMessagePostResponse(&map[string]interface{}{
-				"action": "post_response",
-				"responses": []map[string]interface{}{
-					{
-						"task_id": decryptedMessage["task_id"],
-						"upload":  decryptedMessage,
-					},
-				},
-			}, uuidInfo)
-			uploadResponse := response["responses"].([]map[string]interface{})
-			response = uploadResponse[0]
-		}
-	case "post_response":
-		{
-			response, err = handleAgentMessagePostResponse(&decryptedMessage, uuidInfo)
-			instanceResponse.OuterUuid = outerUUID // this is what our message UUID was coming into this parsing
-		}
-	case "update_info":
-		{
-			response, err = handleAgentMessageUpdateInfo(&decryptedMessage, uuidInfo, agentMessageInput.RemoteIP)
-			instanceResponse.OuterUuid = outerUUID // this is what our message UUID was coming into this parsing
-		}
-	case "staging_rsa":
-		{
-			response, err = handleAgentMessageStagingRSA(&decryptedMessage, uuidInfo)
-			/*
-				if err == nil {
-					outerUUID = response["uuid"].(string)
-				}
-			*/
-		}
-	case "staging_translation":
-		{
-			finalBytes, err := handleAgentMessageStagingTranslation(&decryptedMessage, uuidInfo)
-			if err != nil {
-				logging.LogError(err, "Failed to handle translation staging function")
-				instanceResponse.Err = err
-				return instanceResponse
-			}
-			instanceResponse.Message = *finalBytes
-			return instanceResponse
-
-		}
-	default:
-		{
-			logging.LogError(nil, "Unknown action in message from agent", "action", decryptedMessage["action"])
-			err = errors.New("unknown action in message from agent")
-		}
-	}
-	if err != nil {
-		logging.LogError(err, "Failed to process message from Mythic")
-		instanceResponse.Err = err
-		return instanceResponse
-	}
-	//logging.LogInfo("decrypted message after post response", "decrypted", decryptedMessage)
-	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_RESPONSES]; ok {
-		// this means we got response data outside the post_response key, so handle it
-		if postResponseMap, postResponseMapErr := handleAgentMessagePostResponse(&decryptedMessage, uuidInfo); postResponseMapErr != nil {
-			logging.LogError(err, "Failed to process 'responses' key in non-standard action")
-			response["status"] = "error"
-		} else {
-			for key, val := range postResponseMap {
-				response[key] = val
-			}
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_EDGES]; ok {
-		// this means we have some sort of add/remove announcement
-		edges := []agentMessagePostResponseEdges{}
-		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_EDGES], &edges); err != nil {
-			logging.LogError(err, "Failed to process out edge information")
-		} else {
-			go handleAgentMessagePostResponseEdges(uuidInfo, &edges)
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_DELEGATES]; ok {
-		// this means we have some delegate messages to process recursively
-		delegates := []delegateMessage{}
-		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_DELEGATES], &delegates); err != nil {
-			logging.LogError(err, "Failed to parse delegate messages")
-		} else {
-			for _, delegate := range delegates {
-				if utils.MythicConfig.DebugAgentMessage {
-					logging.LogDebug("Parsing agent message", "step 7", delegate)
-					SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step 7 (delegate messages): \n%v", delegate),
-						uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_INFO)
-				}
-				currentDelegateMessage := AgentMessageRawInput{
-					C2Profile: delegate.C2ProfileName,
-					RemoteIP:  agentMessageInput.RemoteIP,
-				}
-				currentDelegateMessageBytes := []byte(delegate.Message)
-				currentDelegateMessage.Base64Message = &currentDelegateMessageBytes
-				if delegateResponse := recursiveProcessAgentMessage(&currentDelegateMessage); delegateResponse.Err != nil {
-					logging.LogError(delegateResponse.Err, "Failed to process delegate message")
-				} else {
-					newResponse := delegateMessageResponse{
-						Message:       string(delegateResponse.Message),
-						C2ProfileName: delegate.C2ProfileName,
-						SuppliedUuid:  delegate.SuppliedUuid,
-					}
-					if delegateResponse.NewCallbackUUID != "" && delegateResponse.NewCallbackUUID != delegate.SuppliedUuid {
-						newResponse.MythicUuid = delegateResponse.NewCallbackUUID
-						newResponse.NewUuid = delegateResponse.NewCallbackUUID
-						// we got an implicit new callback relationship, mark it
-						go callbackGraph.AddByAgentIds(outerUUID, delegateResponse.NewCallbackUUID, delegate.C2ProfileName)
-					} else {
-						if delegateResponse.OuterUuid != "" && delegateResponse.OuterUuid != delegate.SuppliedUuid {
-							newResponse.MythicUuid = delegateResponse.OuterUuid
-							newResponse.NewUuid = delegateResponse.OuterUuid
-						} else {
-							newResponse.SuppliedUuid = delegate.SuppliedUuid
-						}
-						go callbackGraph.AddByAgentIds(outerUUID, delegateResponse.OuterUuid, delegate.C2ProfileName)
-					}
-					//go callbackGraph.AddByAgentIds(outerUUID, delegateResponse.OuterUuid, delegate.C2ProfileName)
-					delegateResponses = append(delegateResponses, newResponse)
-				}
-			}
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_MESSAGE_KEY_ALERTS]; ok {
-		alerts := []agentMessagePostResponseAlert{}
-		if err := mapstructure.Decode(decryptedMessage[CALLBACK_MESSAGE_KEY_ALERTS], &alerts); err != nil {
-			logging.LogError(err, "Failed to parse alert messages")
-		} else {
-			go handleAgentMessagePostResponseAlerts(uuidInfo.OperationID, uuidInfo.CallbackID, uuidInfo.CallbackDisplayID, &alerts)
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_SOCKS]; ok {
-		socksMessages := []proxyFromAgentMessage{}
-		//logging.LogDebug("got socks data from agent", "data", decryptedMessage[CALLBACK_PORT_TYPE_SOCKS])
-		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_SOCKS], &socksMessages); err != nil {
-			logging.LogError(err, "Failed to convert agent socks message to proxyFromAgentMessage struct")
-		} else {
-			//logging.LogDebug("got socks data from agent mapped into struct", "data", socksMessages)
-			proxyPorts.SendDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_SOCKS, socksMessages)
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_RPORTFWD]; ok {
-		rpfwdMessages := []proxyFromAgentMessage{}
-		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_RPORTFWD], &rpfwdMessages); err != nil {
-			logging.LogError(err, "Failed to convert agent socks message to proxyFromAgentMessage struct")
-		} else {
-			//logging.LogDebug("got rpfwd data from agent mapped into struct", "data", socksMessages)
-			proxyPorts.SendDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_RPORTFWD, rpfwdMessages)
-		}
-	}
-	if _, ok := decryptedMessage[CALLBACK_PORT_TYPE_INTERACTIVE]; ok {
-		interactiveMessages := []agentMessagePostResponseInteractive{}
-		if err = mapstructure.Decode(decryptedMessage[CALLBACK_PORT_TYPE_INTERACTIVE], &interactiveMessages); err != nil {
-			logging.LogError(err, "Failed to convert agent interactive message to agentMessagePostResponseInteractive")
-		} else {
-			proxyPorts.SendInteractiveDataToCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_INTERACTIVE, interactiveMessages)
-		}
-	}
-	// regardless of the message type, get proxy data if it exists (for both socks and rpfwd)
-	if getDelegateMessages {
-		delegateResponses = append(delegateResponses, getDelegateProxyMessages(uuidInfo.CallbackID, agentUUIDLength, agentMessageInput.UpdateCheckinTime)...)
-	}
-	if len(delegateResponses) > 0 {
-		response["delegates"] = delegateResponses
-	}
-	// get first order proxy data not for delegate callbacks
-	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_SOCKS); err != nil {
-		logging.LogError(err, "Failed to get proxy data")
-	} else if proxyData != nil {
-		response[CALLBACK_PORT_TYPE_SOCKS] = proxyData
-	}
-	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_RPORTFWD); err != nil {
-		logging.LogError(err, "Failed to get proxy data")
-	} else if proxyData != nil {
-		response[CALLBACK_PORT_TYPE_RPORTFWD] = proxyData
-	}
-	if proxyData, err := proxyPorts.GetDataForCallbackIdPortType(uuidInfo.CallbackID, CALLBACK_PORT_TYPE_INTERACTIVE); err != nil {
-		logging.LogError(err, "Failed to get interactive data")
-	} else if proxyData != nil {
-		response[CALLBACK_PORT_TYPE_INTERACTIVE] = proxyData
-	}
-	response["action"] = decryptedMessage["action"]
-	// reflect back any non-standard key at the top level
-	reflectBackOtherKeys(&response, &decryptedMessage)
-	// set this for push style c2 notifications
-	if uuidInfo.UUIDType == "callback" {
-		instanceResponse.OuterUuidIsCallback = true
-	}
-	if utils.MythicConfig.DebugAgentMessage {
-		if stringMsg, err := json.MarshalIndent(response, "", "  "); err != nil {
-			logging.LogError(err, "Failed to convert JSON to string for debug printing")
-		} else {
-			logging.LogDebug("Parsing agent message", "step final", response)
-			SendAllOperationsMessage(fmt.Sprintf("Parsing agent message - step final (Response JSON): \n%s",
-				string(stringMsg)),
-				uuidInfo.OperationID, "debug", database.MESSAGE_LEVEL_INFO)
-		}
-	}
-	if err != nil {
-		logging.LogError(err, "Failed to process agent message's action")
-		instanceResponse.Err = err
-		return instanceResponse
-	}
-	responseBytes, err := EncryptMessage(uuidInfo, outerUUID, response, true)
+	responseBytes, err := EncryptMessage(uuidInfo, instanceResponse.OuterUuid, response, true)
 	if err != nil {
 		logging.LogError(err, "Failed to encrypt message in agent_message")
 		instanceResponse.Err = err
 		return instanceResponse
 	}
 	instanceResponse.Message = responseBytes
+	if uuidInfo.UUIDType == UUIDTYPESTAGING {
+		removeCachedEntry(uuidInfo)
+	}
 	return instanceResponse
 }
 
@@ -667,7 +704,7 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 	defer cachedUUIDInfoMapMutex.Unlock()
 	if _, ok := cachedUUIDInfoMap[messageUUID+c2profile]; ok {
 		// we found an instance of the cache info with c2 profile encryption data
-		if cachedUUIDInfoMap[messageUUID+c2profile].UUIDType == "callback" {
+		if cachedUUIDInfoMap[messageUUID+c2profile].UUIDType == UUIDTYPECALLBACK {
 			if updateCheckinTime {
 				UpdateCallbackEdgesAndCheckinTime(cachedUUIDInfoMap[messageUUID+c2profile])
 			}
@@ -676,7 +713,7 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 		return cachedUUIDInfoMap[messageUUID+c2profile], nil
 	} else if _, ok = cachedUUIDInfoMap[messageUUID]; ok {
 		// we found an instance of the cache info with payload encryption data
-		if cachedUUIDInfoMap[messageUUID].UUIDType == "callback" {
+		if cachedUUIDInfoMap[messageUUID].UUIDType == UUIDTYPECALLBACK {
 			if updateCheckinTime {
 				UpdateCallbackEdgesAndCheckinTime(cachedUUIDInfoMap[messageUUID])
 			}
@@ -718,6 +755,7 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 		WHERE callback.agent_callback_id=$1`, messageUUID); err == nil {
 		// we are looking at a callback
 		newCache.UUID = messageUUID
+		newCache.CallbackAllowedFromPayload = true
 		newCache.UUIDType = UUIDTYPECALLBACK
 		newCache.PayloadID = callback.Payload.ID
 		newCache.PayloadTypeID = callback.Payload.Payloadtype.ID
@@ -738,7 +776,7 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 		newCache.TriggerOnCheckinAfterTime = callback.TriggerOnCheckinAfterTime
 	} else if err = database.DB.Get(&payload, `SELECT
 		payload.id, payload.operation_id,
-		payload.deleted, payload.description, payload.uuid,
+		payload.deleted, payload.description, payload.uuid, payload.callback_allowed,
 		payloadtype.id "payloadtype.id",
 		payloadtype.name "payloadtype.name", 
 		payloadtype.mythic_encrypts "payloadtype.mythic_encrypts",
@@ -749,13 +787,9 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 		JOIN payloadtype on payload.payload_type_id = payloadtype.id
 		WHERE payload.uuid=$1`, messageUUID); err == nil {
 		// we're looking at a payload message
-		if payload.Deleted {
-			err = errors.New(fmt.Sprintf("Payload %s, %s, is deleted, but trying to make a new callback. Attempt is blocked until you mark the payload as no longer deleted.", payload.UuID, payload.Description))
-			logging.LogError(err, "rejecting new callback")
-			return &newCache, err
-		}
 		newCache.UUID = messageUUID
 		newCache.UUIDType = UUIDTYPEPAYLOAD
+		newCache.CallbackAllowedFromPayload = payload.CallbackAllowed
 		newCache.PayloadID = payload.ID
 		newCache.PayloadTypeID = payload.Payloadtype.ID
 		newCache.PayloadTypeName = payload.Payloadtype.Name
@@ -828,6 +862,7 @@ func LookupEncryptionData(c2profile string, messageUUID string, updateCheckinTim
 		WHERE staginginfo.staging_uuid=$1`, messageUUID); err == nil {
 		// we're looking at a staging message
 		newCache.UUID = messageUUID
+		newCache.CallbackAllowedFromPayload = true
 		newCache.UUIDType = UUIDTYPESTAGING
 		newCache.StagingEncKey = stager.EncKey
 		newCache.StagingDecKey = stager.DecKey
@@ -996,6 +1031,10 @@ func EncryptMessage(uuidInfo *cachedUUIDInfo, outerUUID string, agentMessage map
 			go SendAllOperationsMessage(fmt.Sprintf("Failed to have translation container process message from Mythic->Custom C2: %s\n%s", uuidInfo.TranslationContainerName, convertedResponse.Error), uuidInfo.OperationID,
 				"mythic_to_c2_"+uuidInfo.TranslationContainerName, database.MESSAGE_LEVEL_WARNING)
 			return nil, errors.New(convertedResponse.Error)
+		}
+		if len(convertedResponse.Message) == 0 {
+			logging.LogError(nil, "empty message from Mythic->C2 translation")
+			return nil, errors.New("empty message from Mythic->C2 translation")
 		}
 		encryptedBytes, err := uuidInfo.IterateAndAct(&convertedResponse.Message, "encrypt")
 		if err != nil {
@@ -1229,5 +1268,16 @@ func GetUUIDBytes(outerUUID string, agentUUIDLength int) ([]byte, error) {
 		}
 	default:
 		return nil, errors.New("unknown UUID length")
+	}
+}
+
+func removeCachedEntry(uuidInfo *cachedUUIDInfo) {
+	// try to prevent the cache from growing indefinitely by removing staging entries after use
+	cachedUUIDInfoMapMutex.Lock()
+	defer cachedUUIDInfoMapMutex.Unlock()
+	for k, _ := range cachedUUIDInfoMap {
+		if cachedUUIDInfoMap[k].UUID == uuidInfo.UUID && cachedUUIDInfoMap[k].UUIDType == UUIDTYPESTAGING {
+			delete(cachedUUIDInfoMap, k)
+		}
 	}
 }

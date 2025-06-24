@@ -28,6 +28,7 @@ mutation updateResolvedStatus($taskartifact_id: Int!, $resolved: Boolean!){
     }
 }
 `;
+
 export function ArtifactTable(props){
     const [artifacts, setArtifacts] = React.useState([]);
     const [updateNeedsCleanup] = useMutation(updateNeedsCleanupMutation, {
@@ -137,22 +138,27 @@ function ArtifactTableRow(props){
                     <Typography variant="body2" >{props.base_artifact}</Typography>
                 </MythicStyledTableCell>
                 <MythicStyledTableCell >
-                    <Typography variant="body2" >{props.task.command.cmd}</Typography>
+                    <Typography variant="body2" >{props?.task?.command?.cmd}</Typography>
                 </MythicStyledTableCell>
                 <MythicStyledTableCell style={{wordBreak: "break-all"}}>
-                    <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" target="_blank"
-                          href={"/new/callbacks/" + props.task.callback.display_id}>
-                        C-{props.task.callback.display_id}
-                    </Link>{" / "}
-                    <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" target="_blank"
-                          href={"/new/task/" + props.task.display_id}>
-                        T-{props.task.display_id}
-                    </Link>
-                    {props.task?.callback?.mythictree_groups.length > 0 ? (
-                        <Typography variant="body2" style={{whiteSpace: "pre"}}>
-                            <b>Groups: </b>{"\n" + props?.task?.callback.mythictree_groups.join("\n")}
-                        </Typography>
-                    ) : null}
+                    {props.task &&
+                    <>
+                        <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" target="_blank"
+                              href={"/new/callbacks/" + props.task.callback.display_id}>
+                            C-{props.task.callback.display_id}
+                        </Link>{" / "}
+                        <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" target="_blank"
+                              href={"/new/task/" + props.task.display_id}>
+                            T-{props.task.display_id}
+                        </Link>
+                        {props.task?.callback?.mythictree_groups.length > 0 ? (
+                            <Typography variant="body2" style={{whiteSpace: "pre"}}>
+                                <b>Groups: </b>{"\n" + props?.task?.callback.mythictree_groups.join("\n")}
+                            </Typography>
+                        ) : null}
+                    </>
+                    }
+
                 </MythicStyledTableCell>
                 <MythicStyledTableCell>
                 <Typography variant="body2" style={{ display: "inline-block"}}>{props?.task?.operator?.username || null}</Typography>

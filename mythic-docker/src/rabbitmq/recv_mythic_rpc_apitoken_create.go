@@ -45,7 +45,7 @@ func MythicRPCAPITokenCreate(input MythicRPCAPITokenCreateMessage) MythicRPCAPIT
 	operatorData := databaseStructs.Operator{}
 	if input.AgentTaskID != nil {
 		task := databaseStructs.Task{AgentTaskID: *input.AgentTaskID}
-		err := database.DB.Get(&task, `SELECT operator_id, operation_id, display_id FROM task WHERE agent_task_id=$1`, task.AgentTaskID)
+		err := database.DB.Get(&task, `SELECT id, operator_id, operation_id, display_id FROM task WHERE agent_task_id=$1`, task.AgentTaskID)
 		if err != nil {
 			response.Error = err.Error()
 			return response
@@ -116,9 +116,9 @@ func MythicRPCAPITokenCreate(input MythicRPCAPITokenCreateMessage) MythicRPCAPIT
 		return response
 	}
 	statement, err := database.DB.PrepareNamed(`INSERT INTO apitokens 
-		(token_value, operator_id, token_type, active, "name", created_by, task_id, callback_id) 
+		(token_value, operator_id, token_type, active, "name", created_by, task_id, callback_id, payload_id) 
 		VALUES
-		(:token_value, :operator_id, :token_type, :active, :name, :created_by, :task_id, :callback_id)
+		(:token_value, :operator_id, :token_type, :active, :name, :created_by, :task_id, :callback_id, :payload_id)
 		RETURNING id`)
 	if err != nil {
 		response.Error = err.Error()

@@ -4,6 +4,301 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.49] - 2025-06-23
+
+### Changed
+
+- Updated the UI to leverage the new payload/callback tagging capabilities
+
+## [0.3.48] - 2025-06-19
+
+### Changed
+
+- Fixed an issue with cli parsing where JavaScript would think `1` is a valid JSON string
+
+## [0.3.46] - 2025-06-19
+
+### Changed
+
+- Updated the task modals to show the name and description at once
+
+## [0.3.45] - 2025-06-17
+
+### Changed
+
+- Updated tasking field to show more info about cwd and impersonation_context
+- Added user setting to show/hide new cwd and impersonation_context tabs
+- Added new tab for extra_info field in callbacks to show
+- Added ability to color cwd, impersonation context, and extra info separately
+- Added ability to generate new payload based on slightly edited config from the payload's Action dropdown
+
+## [0.3.44] - 2025-06-15
+
+### Changed
+
+- Updated the console view to have a output divider
+- Updated the tasking prompt color to be a separate color you can specify in your settings
+- Updated task/callback links to match the tasking prompt color so they blend better
+- Updated the highlighting of text fields to be consistent grey instead of based on the secondary color
+  - should help with some whiplash from editing colors
+- Updated the time formatting for console view
+- Update the command selection pane when building payloads to not show commands you can't include
+
+## [0.3.43] - 2025-06-13
+
+### Changed
+
+- Updated the background image to not tile
+
+## [0.3.42] - 2025-06-12
+
+### Changed
+
+- Updated the way that the "Console" view works for tasking
+- Added `cwd` and `impersonation_context` to UI for callbacks
+
+## [0.3.41] - 2025-06-10
+
+### Changed
+
+- Added more safeguards when importing theme configs to make sure there's valid values
+
+## [0.3.40] - 2025-06-09
+
+### Changed
+
+- Updated the default value for blank arrays to be `[]` instead of `[""]`
+
+## [0.3.39] - 2025-06-06
+
+### Changed
+
+- Fixed some rounded corners on the dashboards page
+- Updated the Payload Types / C2 Profiles page to have some context if there's no container installed of each type
+- Fixed some hasura permissions that were not scoping fetches down to the current operation but all operations you were assigned to
+
+## [0.3.38] - 2025-06-04
+
+### Changed
+
+- Added new button in Artifacts search page to add new artifacts
+
+## [0.3.37] - 2025-06-03
+
+### Changed
+
+- Fixed bug with viewing files for eventing workflows
+- Updated comment view on credential types for tasking
+- Updated resize bars to be a bit thinner so that their color is less intrustive
+- Updated the default dark-mode color for the side bar to be a bit darker
+
+## [0.3.36] - 2025-06-02
+
+### Changed
+
+- Fixed a bug with double-clicking column headers for the active callbacks page that would break while saving preferences
+
+## [0.3.35] - 2025-05-30
+
+### Changed
+
+- Fixed the spacing in the payloads table to not have each row extra large when not full
+
+## [0.3.34] - 2025-05-30
+
+### Changed
+
+- State of the vertical navbar (open/close) is saved in user preferences so it'll stay through refresh
+- Updated the "InviteLinks" UI button on the settings page to only be enabled if you're an admin and the feature is enabled
+- Updated UI and GraphQL to allow bulk file delete
+- Added new User Preference to hide browser-based tasking (file browser / process browser) from your normal tasking views
+- Updated file media viewer to dynamically update as more chunks for a file are received
+- Added a new `task:job_kill` supported UI feature that takes in a raw agent_task_id (uuid)
+  - This shows up as a `skull` icon for tasking that has been picked up by the agent but hasn't completed
+- Updated UI callback drag columns to match vertical navbar color
+
+## [0.3.33] - 2025-05-21
+
+### Changed
+
+- There was an issue with some apollo useLazyQuery functions, specifically for searching and they are updated
+
+## [0.3.32] - 2025-05-19
+
+### Changed
+
+- Fixed a UI update issue with process browser task ids
+- Updated adjacency matrix for process data to check for loops
+
+## [0.3.31] - 2025-05-16
+
+### Changed
+
+- Fixed an issue with updated datagrid components for toggling hiding apitokens
+
+## [0.3.30] - 2025-05-16
+
+### Changed
+
+- Fixed an issue with updated datagrid components in a few UI elements
+
+## [0.3.29] - 2025-05-16
+
+### Changed
+
+- Fixed an issue with updated datagrid components in a few UI elements
+
+## [0.3.28] - 2025-05-11
+
+### Changed
+
+- Updated the cli parsing to accept partial match tab complete for static choice lists 
+- Updated MaterialUI libraries
+- Updated tags to only show first letter until you hover over them to help minimize space
+- Updated Payloads page to be less busy and indicate meaningful data better
+- Updated PayloadTypes&C2Profiles page to Installed Services page
+  - Added tabs for each kind of installed service with counts
+  - Removed dedicated "Consuming Services" page
+- Updated default shortcuts for vertical nav bar
+- Removed horizontal top nav bar and now only use the vertical navbar
+- Fixed an issue with multi-select on the payload builders page
+- Updated dashboard home page to have "Operator", "Lead", and "Custom" views
+  - Custom view is saved to your preferences and allows you to choose which dashboard elements on which rows you want
+  - Dashboard elements have additional action buttons and shortcuts
+
+## [0.3.27] - 2025-04-16
+
+### Changed
+
+- Updated processing for font size so virtualized row height is properly updated
+
+## [0.3.26] - 2025-04-15
+
+### Changed
+
+- Updated the tag search for files to not distinct on tag id but file id
+
+## [0.3.25] - 2025-04-10
+
+### Changed
+
+- Updated the reporting table to indicate comma separated values are needed
+
+## [0.3.24] - 2025-04-10
+
+### Changed
+
+- Updated the lab field for text fields to default to True
+
+## [0.3.23] - 2025-04-08
+
+### Changed
+
+- Updated the graph view's edge color to be more intuitive - green/red vs blue/orange
+- Updated the color of selecting agents in the grpah view to be more apparent
+
+## [0.3.22] - 2025-04-07
+
+### Changed
+
+- Fixed credential table to not expand columns
+
+## [0.3.21] - 2025-04-01 
+
+### Changed
+
+- Updated vertical nav bar to link to home when clicking mythic icon
+- Updated spacing on fields for home dashboard
+- Updated response/task sorting on interactive tasks
+- Added a few more tooltips for existing icons
+- Updated a few clickable icons to be icon buttons
+- Updated payload generation parameter displays
+- Fixed a few warning messages from MUI
+
+## [0.3.20] - 2025-03-28
+
+### Changed
+
+- Updated the "table/graph" speeddial button on the active callbacks page to be a side bar instead
+- Updated the reverse search to include original params, not just command names
+- Removed confirmation popup for non-agent payload types during payload creation for c2 profiles and an exit command
+- Updated Eventing workflow wizard to support the new tag_create trigger
+- Updated CreateTag API call to go through `createTag` action vs `insert_tag_one` to hook into new eventing
+- Added ability to re-trigger dynamic query functions in the modals
+- Added the ability to pass along other parameters as well and their values for the dynamic query function
+- Updated the backdrop for dynamic query calls to just be that element instead of the whole screen
+- Updated the `tags` page
+
+## [0.3.19] - 2025-03-19
+
+### Changed
+
+- Fixed an issue where the "deleted" status wouldn't get updated for file browser UI
+
+## [0.3.18] - 2025-03-11
+
+### Changed
+
+- Fixed the vertical extra icons on short layouts that wouldn't auto expand to show them
+
+## [0.3.17] - 2025-03-11
+
+### Changed
+
+- Updated the browserscript table to properly apply MUI colors to icons
+- Updated the split tasking and regular task output to handle multiple tables better
+- Updated the table rendering for task output to try to be a bit more performant
+
+## [0.3.16] - 2025-03-07
+
+### Changed
+
+- Updated all dropdown menus for tasking to be MenuItem and not Native formatted
+- Updated dropdown fields for tasking to register newlines
+- Fixes for timeskew calculations
+
+## [0.3.15] - 2025-03-04
+
+### Changed
+
+- Added additional error messages on login
+
+## [0.3.14] - 2025-02-26
+
+### Changed
+
+- Updated file preview for 'text' to properly show extra characters
+- Updated payloads table description to break words
+- Fixed the rendering for multiple tables in a single output
+
+## [0.3.13] - 2025-02-21
+
+### Changed
+
+- Updated the debounce delay on logon to be 0 to prevent failed logons
+- Updated graph edges to not be connectable
+- Fixed an issue with event notifications not showing up
+
+## [0.3.12] - 2025-02-21
+
+### Changed
+
+- Updated UI to allow changing what's displayed for the task's timestamp field via user settings
+
+## [0.3.11] - 2025-02-20
+
+### Changed
+
+- Updated the background coloring for images to make it a bit easier to see text on harsh background
+- Updated default font family
+- Updated command and parameter search to include original and updated command names for aliases
+
+## [0.3.10] - 2025-02-13
+
+### Changed
+
+- Updated processing of arrays and typedarrays to have option to not split on newlines
+
 ## [0.3.9] - 2025-02-07
 
 ### Changed

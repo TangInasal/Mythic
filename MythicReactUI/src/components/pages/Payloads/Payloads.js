@@ -10,6 +10,7 @@ fragment payloadData on payload {
   build_phase
   build_stderr
   callback_alert
+  callback_allowed
   id
   operator {
     id
@@ -35,6 +36,14 @@ fragment payloadData on payload {
     end_time
     step_stdout
     step_stderr
+    id
+  }
+  tags {
+    tagtype {
+        name
+        color
+        id
+      }
     id
   }
   filemetum {
@@ -82,28 +91,42 @@ query PayloadsQuery($offset: Int!, $limit: Int!, $showDeleted: Boolean!, $showAu
 }
 `;
 export const payloadsDelete = gql`
-mutation PayloadsDeletePayloadMutation($id: Int!) {
-  deleteFile(file_id: $id) {
-      file_ids
+mutation PayloadsDeletePayloadMutation($payload_uuid: String!) {
+  updatePayload(payload_uuid: $payload_uuid, deleted: true) {
       status
       error
-      payload_ids
+      id
+      deleted
   }
 }
 `;
 export const payloadsCallbackAlert = gql`
-mutation PayloadsCallbackAlertMutation($id: Int!, $callback_alert: Boolean!) {
-  update_payload_by_pk(pk_columns: {id: $id}, _set: {callback_alert: $callback_alert}) {
+mutation PayloadsCallbackAlertMutation($payload_uuid: String!, $callback_alert: Boolean!) {
+  updatePayload(callback_alert: $callback_alert, payload_uuid: $payload_uuid) {
     id
     callback_alert
+    status
+    error
   }
 }
 `;
 export const restorePayloadMutation = gql`
-mutation RestorePayloadToUndeleted($id: Int!){
-  update_payload_by_pk(pk_columns: {id: $id}, _set: {deleted: false}){
+mutation RestorePayloadToUndeleted($payload_uuid: String!){
+  updatePayload(deleted: false, payload_uuid: $payload_uuid) {
     id
     deleted
+    status
+    error
+  }
+}
+`;
+export const payloadsCallbackAllowed = gql`
+mutation PayloadsCallbackAllowedMutation($payload_uuid: String!, $callback_allowed: Boolean!) {
+  updatePayload(callback_allowed: $callback_allowed, payload_uuid: $payload_uuid) {
+    id
+    callback_allowed
+    status
+    error
   }
 }
 `;
@@ -178,9 +201,9 @@ export function Payloads(props){
     }
     const [deletePayload] = useMutation(payloadsDelete, {
         onCompleted: (data) => {
-          if(data.deleteFile.status === "success"){
+          if(data.updatePayload.status === "success"){
             const updated = payloads.map( (p) => {
-              if(data.deleteFile.payload_ids.includes(p.id)){
+              if(data.updatePayload.id === p.id){
                 return {...p, deleted: true};
               }else{
                 return {...p}
@@ -189,7 +212,7 @@ export function Payloads(props){
             setPayloads(updated);
             snackActions.success("Successfully deleted");
           }else{
-            snackActions.error(data.deleteFile.error);
+            snackActions.error(data.updatePayload.error);
           }
           
         },
@@ -201,14 +224,14 @@ export function Payloads(props){
     const [restorePayload] = useMutation(restorePayloadMutation, {
       onCompleted: (data) => {
         const updated = payloads.map( (payload) => {
-          if(payload.id === data.update_payload_by_pk.id){
-            return {...payload, ...data.update_payload_by_pk};
+          if(payload.id === data.updatePayload.id){
+            return {...payload, ...data.updatePayload};
           }else{
             return {...payload};
           }
         });
         setPayloads(updated);
-        if(data.update_payload_by_pk.deleted === false){
+        if(data.updatePayload.deleted === false){
           snackActions.success("Successfully marked payload as not deleted");
         }
       },
@@ -220,13 +243,13 @@ export function Payloads(props){
     const [callbackAlert] = useMutation(payloadsCallbackAlert, {
       onCompleted: (data) => {
         const updated = payloads.map( (payload) => {
-          if(payload.id === data.update_payload_by_pk.id){
-            return {...payload, ...data.update_payload_by_pk};
+          if(payload.id === data.updatePayload.id){
+            return {...payload, ...data.updatePayload};
           }else{
             return {...payload};
           }
         });
-        if(data.update_payload_by_pk.callback_alert){
+        if(data.updatePayload.callback_alert){
           snackActions.success("Now Alerting on New Callbacks");
         }else{
           snackActions.success("No Longer Alerting on New Callbacks");
@@ -239,18 +262,40 @@ export function Payloads(props){
         console.log(data);
       }
     });
-    const onDeletePayload = (id) => {
-        deletePayload({variables: {id}});
+    const [callbackAllowed] = useMutation(payloadsCallbackAllowed, {
+        onCompleted: (data) => {
+            const updated = payloads.map( (payload) => {
+                if(payload.id === data.updatePayload.id){
+                    return {...payload, ...data.updatePayload};
+                }else{
+                    return {...payload};
+                }
+            });
+            if(data.updatePayload.callback_allowed){
+                snackActions.success("Now Allowing New Callbacks from this Payload");
+            }else{
+                snackActions.success("No Longer Allowing New Callbacks from this Payload");
+            }
+
+            setPayloads(updated);
+        },
+        onError: (data) => {
+            snackActions.warning("Failed to update callback alerting status");
+            console.log(data);
+        }
+    });
+    const onDeletePayload = (payload_uuid) => {
+        deletePayload({variables: {payload_uuid}});
     }
-    const onUpdateCallbackAlert = (id, callback_alert) => {
+    const onUpdateCallbackAlert = (payload_uuid, callback_alert) => {
         callbackAlert({
-            variables: {id, callback_alert}
+            variables: {payload_uuid, callback_alert}
         
         });
     }
-    const onRestorePayload = (id) => {
+    const onRestorePayload = (payload_uuid) => {
       restorePayload({
-        variables: {id}
+        variables: {payload_uuid}
       })
     }
     const onChangeShowDeleted = (showDeleted) => {
@@ -271,6 +316,9 @@ export function Payloads(props){
         }
         fetchNewPage({variables: {offset:0, limit: pageData.fetchLimit, showDeleted: pageData.showDeleted, showAutogenerated: showAutogenerated}});
     }
+    const onCallbacksAllowedChanged = (payload_uuid, callback_allowed) => {
+        callbackAllowed({variables: {payload_uuid, callback_allowed}});
+    }
     React.useEffect( () => {
       return() => {
         mountedRef.current = false;
@@ -286,6 +334,7 @@ export function Payloads(props){
             onRestorePayload={onRestorePayload}
             onChangePage={onChangePage}
             onChangeShowDeleted={onChangeShowDeleted}
+            onCallbacksAllowedChanged={onCallbacksAllowedChanged}
             onChangeShowAutogenerated={onChangeShowAutogenerated}
             />
         </div>

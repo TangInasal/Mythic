@@ -25,13 +25,19 @@ import { Backdrop } from '@mui/material';
 import {CircularProgress} from '@mui/material';
 import MythicStyledTableCell from '../../MythicComponents/MythicTableCell';
 import {MythicFileContext} from "../../MythicComponents/MythicFileContext";
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 export const getDynamicQueryParams = gql`
-mutation getDynamicParamsMutation($callback: Int!, $command: String!, $payload_type: String!, $parameter_name: String!){
-    dynamic_query_function(callback: $callback, command: $command, payload_type: $payload_type, parameter_name: $parameter_name){
+mutation getDynamicParamsMutation($callback: Int!, $command: String!, $payload_type: String!, $parameter_name: String!, $other_parameters: jsonb){
+    dynamic_query_function(callback: $callback, command: $command, payload_type: $payload_type, parameter_name: $parameter_name, other_parameters: $other_parameters){
         status
         error
         choices
+        parameter_name
+        complex_choices {
+            value
+            display_value
+        }
     }
 }
 `;
@@ -84,9 +90,9 @@ export function TaskParametersDialogRow(props){
     const currentParameterGroup = React.useRef(props.parameterGroupName);
     const [ChoiceOptions, setChoiceOptions] = React.useState([]);
     const [boolValue, setBoolValue] = React.useState(false);
-    const [arrayValue, setArrayValue] = React.useState([""]);
+    const [arrayValue, setArrayValue] = React.useState([]);
     const [typedArrayValue, setTypedArrayValue] = React.useState([]);
-    const [choiceMultipleValue, setChoiceMultipleValue] = React.useState([]);
+    const [chooseMultipleValue, setChooseMultipleValue] = React.useState([]);
     const [chooseOneCustomValue, setChooseOneCustomValue] = React.useState("");
     const [agentConnectNewHost, setAgentConnectNewHost] = React.useState("");
     const [agentConnectHostOptions, setAgentConnectHostOptions] = React.useState([]);
@@ -102,47 +108,100 @@ export function TaskParametersDialogRow(props){
     const [fileMultValue, setFileMultValue] = React.useState([]);
     const [backdropOpen, setBackdropOpen] = React.useState(false);
     const usingDynamicParamChoices = React.useRef(false);
+    const usingDynamicParamComplexChoices = React.useRef(false);
     const usingParsedTypedArray = React.useRef(true);
     const updateToLatestCredential = React.useRef(false);
     const [getDynamicParams] = useMutation(getDynamicQueryParams, {
         onCompleted: (data) => {
             if(data.dynamic_query_function.status === "success"){
                 try{
-                    setChoiceOptions([...data.dynamic_query_function.choices]);
+                    let choicesInUse = [];
+                    if (data.dynamic_query_function.complex_choices !== null && data.dynamic_query_function.complex_choices.length > 0) {
+                        usingDynamicParamComplexChoices.current = true;
+                        setChoiceOptions([...data.dynamic_query_function.complex_choices]);
+                        choicesInUse = [...data.dynamic_query_function.complex_choices];
+                    } else {
+                        usingDynamicParamComplexChoices.current = false;
+                        setChoiceOptions([...data.dynamic_query_function.choices]);
+                        choicesInUse = [...data.dynamic_query_function.choices];
+                    }
                     usingDynamicParamChoices.current = true;
                     if(props.type === "ChooseOne"){
-                        if(data.dynamic_query_function.choices.length > 0){
-                            if(props.value !== ""){
+                        if(choicesInUse.length > 0){
+                            if(props.value !== "") {
                                 setValue(props.value);
                                 props.onChange(props.name, props.value, false);
-                            } else if(data.dynamic_query_function.choices.includes(props.default_value)) {
+                            } else if(usingDynamicParamComplexChoices.current){
+                                const valueOptions = choicesInUse.map(c => c.value);
+                                if(valueOptions.includes(props.default_value)){
+                                    setValue(props.default_value);
+                                    props.onChange(props.name, props.default_value, false);
+                                } else {
+                                    setValue(choicesInUse[0].value);
+                                    props.onChange(props.name, choicesInUse[0].value, false);
+                                }
+                            } else if(choicesInUse.includes(props.default_value)) {
                                 setValue(props.default_value);
                                 props.onChange(props.name, props.default_value, false);
                             } else {
-                                setValue(data.dynamic_query_function.choices[0]);
-                                props.onChange(props.name, data.dynamic_query_function.choices[0], false);
+                                setValue(choicesInUse[0]);
+                                props.onChange(props.name, choicesInUse[0], false);
                             }
                         }
                     } else if(props.type === "ChooseOneCustom"){
                         let newStandardValue = props.default_value;
-                        if(data.dynamic_query_function.choices.includes(props.default_value) && props.value !== "") {
+                        if(usingDynamicParamComplexChoices.current){
+                            const valueOptions = choicesInUse.map(c => c.value);
+                            if(valueOptions.includes(props.default_value)){
+                                setValue(props.default_value);
+                            } else {
+                                setValue(choicesInUse[0].value);
+                                newStandardValue = choicesInUse[0].value;
+                            }
+                        } else if(choicesInUse.includes(props.default_value) && props.value !== "") {
                             setValue(props.default_value);
-                            //props.onChange(props.name, props.default_value, false);
                         } else {
-                            setValue(data.dynamic_query_function.choices[0]);
-                            newStandardValue = data.dynamic_query_function.choices[0];
-                            //props.onChange(props.name, data.dynamic_query_function.choices[0], false);
+                            setValue(choicesInUse[0]);
+                            newStandardValue = choicesInUse[0];
                         }
-                        if(!data.dynamic_query_function.choices.includes(props.value) && props.value !== "" ){
+                        if(!choicesInUse.includes(props.value) && props.value !== "" ){
                             setChooseOneCustomValue(props.value);
                             newStandardValue = props.value;
                         }
                         props.onChange(props.name, newStandardValue, false);
+                    } else if(props.type === "ChooseMultiple"){
+                        if(choicesInUse.length > 0){
+                            if(props.value.length > 0) {
+                                setValue(props.value);
+                                setChooseMultipleValue(props.value);
+                                props.onChange(props.name, props.value, false);
+                            } else if(usingDynamicParamComplexChoices.current){
+                                const valueOptions = choicesInUse.map(c => c.value);
+                                if(valueOptions.includes(props.default_value)){
+                                    setChooseMultipleValue([props.default_value]);
+                                    setValue(props.default_value);
+                                    props.onChange(props.name, [props.default_value], false);
+                                } else {
+                                    setChooseMultipleValue([choicesInUse[0].value]);
+                                    setValue(choicesInUse[0].value);
+                                    props.onChange(props.name, [choicesInUse[0].value], false);
+                                }
+                            } else if(choicesInUse.includes(props.default_value)) {
+                                setChooseMultipleValue([props.default_value]);
+                                props.onChange(props.name, [props.default_value], false);
+                            } else {
+                                setChooseMultipleValue([choicesInUse[0]]);
+                                setValue(choicesInUse[0].value);
+                                props.onChange(props.name, [choicesInUse[0]], false);
+                            }
+                        }
                     }
                 }catch(error){
                     setBackdropOpen(false);
                     snackActions.warning("Failed to parse dynamic parameter results");
+                    usingDynamicParamComplexChoices.current = false;
                     setChoiceOptions([]);
+                    setValue("");
                 }
                 
             }else{
@@ -209,7 +268,20 @@ export function TaskParametersDialogRow(props){
             snackActions.error("Failed to create credential");
             console.log(data);
         }
-    })
+    });
+    const [treatNewlinesAsNewEntries, setTreatNewlinesAsNewEntries] = React.useState(false);
+    const reIssueDynamicQueryFunction = () => {
+        setBackdropOpen(true);
+        snackActions.info("Querying payload type container for options...",  {autoClose: 1000});
+        getDynamicParams({variables:{
+                callback: props.callback_id,
+                parameter_name: props.name,
+                command: props.commandInfo.cmd,
+                payload_type: props.commandInfo.payloadtype.name,
+                other_parameters: props.getOtherParameters()
+            }})
+        usingDynamicParamChoices.current = true;
+    }
     useEffect( () => {
         if(props.dynamic_query_function !== ""){
             if(!usingDynamicParamChoices.current){
@@ -219,7 +291,8 @@ export function TaskParametersDialogRow(props){
                     callback: props.callback_id,
                     parameter_name: props.name,
                     command: props.commandInfo.cmd,
-                    payload_type: props.commandInfo.payloadtype.name
+                    payload_type: props.commandInfo.payloadtype.name,
+                        other_parameters: props.getOtherParameters()
                 }})
             }
             usingDynamicParamChoices.current = true;
@@ -268,13 +341,19 @@ export function TaskParametersDialogRow(props){
        }else if(props.type === "ChooseMultiple" && props.dynamic_query_function === ""){
            //console.log("ChooseMultiple", props.value, value);
            if(value === ""){
-                setChoiceMultipleValue(props.value);
+                setChooseMultipleValue(props.value);
                 setValue(props.value);
                 setChoiceOptions(props.choices);
            } else if (currentParameterGroup.current !== props.parameterGroupName){
-               setChoiceMultipleValue(props.value);
+               setChooseMultipleValue(props.value);
                setValue(props.value);
                setChoiceOptions(props.choices);
+           }
+       }
+       else if(props.type === "LinkInfo"){
+           if(props.choices.length > 0){
+               setChoiceOptions([...props.choices]);
+               onChangeLinkInfo(0);
            }
        }
        else if(props.type === "AgentConnect"){
@@ -317,7 +396,12 @@ export function TaskParametersDialogRow(props){
                    if(props.value === ""){
                        setValue(0);
                    }else{
-                        setValue(parseInt(props.value));
+                       try{
+                           setValue(parseInt(props.value));
+                       }catch(error){
+                           console.log("expected number, but", props.value, "isn't number");
+                           setValue(0);
+                       }
                    }
                }else{
                     setValue(props.value);
@@ -331,6 +415,9 @@ export function TaskParametersDialogRow(props){
                 props.onChange(props.name, {...props.choices[props.choices.length-1]}, false);
                 updateToLatestCredential.current = false;
                }
+               if(value === ""){
+                   setValue(0);
+               }
            }
            if(props.dynamic_query_function === null && value===""){
                 setChoiceOptions([...props.choices]);
@@ -338,12 +425,9 @@ export function TaskParametersDialogRow(props){
            }else if(props.choices.length !== ChoiceOptions.length){
                if(!usingDynamicParamChoices.current){
                     setChoiceOptions([...props.choices]);
-               }    
-               
+               }
            }
-           
        }
-       
     }, [props.choices, props.default_value, props.type, props.value, setBoolValue, value]);
     const onChangeAgentConnect = (host_index, payload_index, c2_index) => {
         const c2profileparameters = props.choices[host_index]["payloads"][payload_index]["c2info"][c2_index].parameters.reduce( (prev, opt) => {
@@ -384,17 +468,11 @@ export function TaskParametersDialogRow(props){
         setValue(evt.target.value);
         props.onChange(props.name, ChoiceOptions[evt.target.value], false);
     }
-    const onChangeChoiceMultiple = (event) => {
-        const { options } = event.target;
-        let localValue = [];
-        for (let i = 0, l = options.length; i < l; i += 1) {
-          if (options[i].selected) {
-              localValue.push(options[i].value);
-          }
-        }
-        setChoiceMultipleValue(localValue);
-        setValue(localValue);
-        props.onChange(props.name, localValue, false);
+    const onChangeChooseMultiple = (event) => {
+        const { value:options } = event.target;
+        setChooseMultipleValue(options);
+        setValue(options);
+        props.onChange(props.name, options, false);
     }
     const onChangeText = (name, value, error) => {
         setValue(value);
@@ -503,12 +581,19 @@ export function TaskParametersDialogRow(props){
         setArrayValue(removed);
         props.onChange(props.name, removed, false);
     }
+    const toggleTreatNewlinesAsNewEntries = () => {
+        setTreatNewlinesAsNewEntries(!treatNewlinesAsNewEntries);
+    }
     const onChangeArrayText = (value, error, index) => {
         let values = [...arrayValue];
         if(value.includes("\n")){
-            let new_values = value.split("\n");
-            values = [...values, ...new_values.slice(1)];
-            values[index] = new_values[0];
+            if(treatNewlinesAsNewEntries){
+                let new_values = value.split("\n");
+                values = [...values, ...new_values.slice(1)];
+                values[index] = new_values[0];
+            } else {
+                values[index] = value;
+            }
         }else{
             values[index] = value;
         }
@@ -537,9 +622,13 @@ export function TaskParametersDialogRow(props){
     const onChangeTypedArrayText = (value, error, index) => {
         let values = [...typedArrayValue];
         if(value.includes("\n")){
-            let new_values = value.split("\n");
-            values = [...values, [props.default_value, ...new_values.slice(1)]];
-            values[index][1] = new_values[0];
+            if(treatNewlinesAsNewEntries){
+                let new_values = value.split("\n");
+                values = [...values, [props.default_value, ...new_values.slice(1)]];
+                values[index][1] = new_values[0];
+            } else {
+                values[index][1] = value;
+            }
         }else{
             values[index][1] = value;
         }
@@ -560,7 +649,7 @@ export function TaskParametersDialogRow(props){
         switch(props.type){
             case "ChooseOneCustom":
                 return (
-                    <React.Fragment>
+                    <div style={{position: "relative"}}>
                         <Backdrop open={backdropOpen} style={{zIndex: 2, position: "absolute"}} invisible={false}>
                             <CircularProgress color="inherit" />
                         </Backdrop>
@@ -576,7 +665,11 @@ export function TaskParametersDialogRow(props){
                                 >
                                     {
                                         ChoiceOptions.map((opt, i) => (
-                                            <MenuItem key={props.name + i} value={opt}>{opt}</MenuItem>
+                                            <MenuItem key={props.name + i} value={opt}>
+                                                <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                                {opt}
+                                                </Typography>
+                                            </MenuItem>
                                         ))
                                     }
                                 </Select>
@@ -586,14 +679,21 @@ export function TaskParametersDialogRow(props){
                                              onChange={onChangeTextChooseOneCustom} display="inline-block" onEnter={props.onSubmit} autoFocus={props.autoFocus}
                                              name={props.name} marginTop={"5px"}
                             />
+                            {props.dynamic_query_function !== "" &&
+                                <MythicStyledTooltip title={"ReIssue Dynamic Query Function"} tooltipStyle={{display: "inline-block"}}>
+                                    <IconButton onClick={reIssueDynamicQueryFunction}>
+                                        <RefreshIcon />
+                                    </IconButton>
+                                </MythicStyledTooltip>
+                            }
                         </div>
 
-                    </React.Fragment>
+                    </div>
                 )
             case "ChooseOne":
             case "ChooseMultiple":
                 return (
-                    <React.Fragment>
+                    <div style={{position: "relative", display: "flex", alignItems: "center", overflow: "hidden"}}>
                         <Backdrop open={backdropOpen} style={{zIndex: 2, position: "absolute"}} invisible={false}>
                             <CircularProgress color="inherit" />
                         </Backdrop>
@@ -602,22 +702,32 @@ export function TaskParametersDialogRow(props){
                                 <InputLabel>{"No Options Available"}</InputLabel>
                             }
                             <Select
-                            native
                             disabled={ChoiceOptions.length === 0}
                             autoFocus={props.autoFocus}
                             multiple={props.type === "ChooseMultiple"}
-                            value={props.type === "ChooseMultiple" ? choiceMultipleValue : value}
-                            onChange={props.type === "ChooseMultiple" ? onChangeChoiceMultiple : onChangeValue}
+                            value={props.type === "ChooseMultiple" ? chooseMultipleValue : value}
+                            onChange={props.type === "ChooseMultiple" ? onChangeChooseMultiple : onChangeValue}
                             input={<Input />}
                             >
                             {
                                 ChoiceOptions.map((opt, i) => (
-                                    <option key={props.name + i} value={opt}>{opt}</option>
+                                    <MenuItem key={props.name + i} value={usingDynamicParamComplexChoices.current ? opt.value : opt}>
+                                        <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap", display: "inline-block"}}>
+                                        {usingDynamicParamComplexChoices.current ? opt.display_value : opt}
+                                        </Typography>
+                                    </MenuItem>
                                 ))
                             }
                             </Select>
                         </FormControl>
-                    </React.Fragment>
+                        {props.dynamic_query_function !== "" &&
+                            <MythicStyledTooltip title={"ReIssue Dynamic Query Function"} tooltipStyle={{display: "inline-block"}}>
+                                <IconButton onClick={reIssueDynamicQueryFunction}>
+                                    <RefreshIcon />
+                                </IconButton>
+                            </MythicStyledTooltip>
+                        }
+                    </div>
                     
                 )
             case "Array":
@@ -625,13 +735,23 @@ export function TaskParametersDialogRow(props){
                     <TableContainer >
                         <Table size="small" style={{tableLayout: "fixed", maxWidth: "100%", "overflow": "auto"}}>
                             <TableBody>
+                                <TableRow>
+                                    <MythicStyledTableCell>Treat new lines as new entries</MythicStyledTableCell>
+                                    <MythicStyledTableCell>
+                                        <Switch checked={treatNewlinesAsNewEntries} onChange={toggleTreatNewlinesAsNewEntries} color={"info"} />
+                                    </MythicStyledTableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                        <Table size="small" style={{tableLayout: "fixed", maxWidth: "100%", "overflow": "auto"}}>
+                            <TableBody>
                                 {arrayValue.map( (a, i) => (
                                     <TableRow key={'array' + props.name + i} >
                                         <MythicStyledTableCell style={{width: "2rem"}}>
                                             <MythicStyledTooltip title={"Remove array element"}>
-                                                <DeleteIcon onClick={(e) => {removeArrayValue(i)}} color="error"
-                                                            style={{cursor: "pointer"}}
-                                                />
+                                                <IconButton onClick={(e) => {removeArrayValue(i)}} color="error">
+                                                    <DeleteIcon />
+                                                </IconButton>
                                             </MythicStyledTooltip>
                                         </MythicStyledTableCell>
                                         <MythicStyledTableCell>
@@ -658,6 +778,16 @@ export function TaskParametersDialogRow(props){
             case "TypedArray":
                 return (
                     <TableContainer >
+                        <Table size="small" style={{tableLayout: "fixed", maxWidth: "100%", "overflow": "auto"}}>
+                            <TableBody>
+                                <TableRow>
+                                    <MythicStyledTableCell>Treat new lines as new entries</MythicStyledTableCell>
+                                    <MythicStyledTableCell>
+                                        <Switch checked={treatNewlinesAsNewEntries} onChange={toggleTreatNewlinesAsNewEntries} color={"info"} />
+                                    </MythicStyledTableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                         <Table size="small" style={{tableLayout: "fixed", maxWidth: "100%", "overflow": "auto"}}>
                             <TableBody>
                                 {typedArrayValue.map( (a, i) => (
@@ -753,7 +883,6 @@ export function TaskParametersDialogRow(props){
                 return (
                     <FormControl style={{width: "100%"}}>
                         <Select
-                          native
                           value={value}
                           autoFocus={props.autoFocus}
                           onChange={(evt) => {onChangeLinkInfo(evt.target.value)}}
@@ -761,7 +890,11 @@ export function TaskParametersDialogRow(props){
                         >
                         {
                             props.choices.map((opt, i) => (
-                                <option key={props.name + i} value={i}>{opt.display}</option>
+                                <MenuItem key={props.name + i} value={i}>
+                                    <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                    {opt.display}
+                                    </Typography>
+                                </MenuItem>
                             ))
                         }
                         </Select>
@@ -771,16 +904,18 @@ export function TaskParametersDialogRow(props){
                 return (
                     <FormControl style={{width: "100%"}}>
                         <Select
-                          native
                           value={value}
-
                           autoFocus={props.autoFocus}
                           onChange={onChangeValue}
                           input={<Input  />}
                         >
                         {
                             props.choices.map((opt, i) => (
-                                <option key={props.name + i} value={opt.uuid}>{opt.display}</option>
+                                <MenuItem key={props.name + i} value={opt.uuid}>
+                                    <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                    {opt.display}
+                                    </Typography>
+                                </MenuItem>
                             ))
                         }
                         </Select>
@@ -805,16 +940,19 @@ export function TaskParametersDialogRow(props){
                                         <MythicStyledTableCell>
                                             <FormControl style={{width: "100%"}}>
                                                 <Select
-                                                  native
                                                   value={agentConnectNewPayload}
                                                   onChange={onChangeAgentConnectNewPayload}
                                                   input={<Input />}
                                                 >
                                                 {props.payload_choices ? (
                                                     props.payload_choices.map((opt, i) => (
-                                                        <option key={props.name + "newpayload" + i} value={i}>{opt.display}</option>
+                                                        <MenuItem key={props.name + "newpayload" + i} value={i}>
+                                                            <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                                            {opt.display}
+                                                            </Typography>
+                                                        </MenuItem>
                                                     ))
-                                                ) : ( <option key={props.name + "nooptionnewpayload"} value="-1">No Payloads</option> )}
+                                                ) : ( <MenuItem key={props.name + "nooptionnewpayload"} value="-1">No Payloads</MenuItem> )}
                                                 </Select>
                                             </FormControl>
                                         </MythicStyledTableCell>
@@ -839,14 +977,13 @@ export function TaskParametersDialogRow(props){
                                         <MythicStyledTableCell>
                                             <FormControl style={{width: "100%"}}>
                                                 <Select
-                                                native
                                                 value={agentConnectHost}
                                                 onChange={onChangeAgentConnectHost}
                                                 input={<Input />}
                                                 >
                                                 {
                                                     agentConnectHostOptions.map((opt, i) => (
-                                                        <option key={props.name + "connecthost" + i} value={i}>{opt.host}</option>
+                                                        <MenuItem key={props.name + "connecthost" + i} value={i}>{opt.host}</MenuItem>
                                                     ))
                                                 }
                                                 </Select>
@@ -858,14 +995,17 @@ export function TaskParametersDialogRow(props){
                                         <MythicStyledTableCell>
                                             <FormControl style={{width: "100%"}}>
                                                 <Select
-                                                native
                                                 value={agentConnectPayload}
                                                 onChange={onChangeAgentConnectPayload}
                                                 input={<Input />}
                                                 >
                                                 {
                                                     agentConnectPayloadOptions.map((opt, i) => (
-                                                        <option key={props.name + "connectagent" + i} value={i}>{opt.display}</option>
+                                                        <MenuItem key={props.name + "connectagent" + i} value={i}>
+                                                            <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                                            {opt.display}
+                                                            </Typography>
+                                                        </MenuItem>
                                                     ))
                                                 }
                                                 </Select>
@@ -895,14 +1035,13 @@ export function TaskParametersDialogRow(props){
                                         <MythicStyledTableCell>
                                             <FormControl style={{width: "100%"}}>
                                                     <Select
-                                                    native
                                                     value={agentConnectC2Profile}
                                                     onChange={onChangeAgentConnectC2Profile}
                                                     input={<Input />}
                                                     >
                                                     {
                                                         agentConnectC2ProfileOptions.map((opt, i) => (
-                                                            <option key={props.name + "connectprofile" + i} value={i}>{opt.name}</option>
+                                                            <MenuItem key={props.name + "connectprofile" + i} value={i}>{opt.name}</MenuItem>
                                                         ))
                                                     }
                                                     </Select>
@@ -941,7 +1080,6 @@ export function TaskParametersDialogRow(props){
                         />
                         <FormControl style={{width: "100%"}}>
                             <Select
-                                native
                                 value={value}
                                 autoFocus={props.autoFocus}
                                 onChange={onChangeCredentialJSONValue}
@@ -949,9 +1087,20 @@ export function TaskParametersDialogRow(props){
                             >
                             {
                                 ChoiceOptions.map((opt, i) => (
-                                    <option key={props.name + i} value={i}>
-                                        {opt.account + "@" + opt.realm + " - " + opt.credential_text.substring(0, 10) + " - " + opt.comment}
-                                    </option>
+                                    <MenuItem key={props.name + i} value={i}>
+                                        <Typography style={{wordBreak: "break-all", whiteSpace: "pre-wrap"}}>
+                                            {opt.account + (opt.realm === "" ? "" : "@" + opt.realm) + " - " +
+                                                (opt.credential_text.length > 40 ? opt.credential_text.substring(0, 40) + "..." : opt.credential_text)}
+                                            {opt.comment.length > 0 ?
+                                                (
+                                                    <>
+                                                        <b>{"\nComment: "}</b>  {opt.comment}
+                                                    </>
+                                                )
+                                                : ""}
+                                        </Typography>
+
+                                    </MenuItem>
                                 ))
                             }
                             </Select>
@@ -967,11 +1116,14 @@ export function TaskParametersDialogRow(props){
     return (
             <TableRow key={"buildparam" + props.id}>
                 <MythicStyledTableCell >
-                    <MythicStyledTooltip title={props.description.length > 0 ? props.description : "No Description"}>
+                    <Typography style={{fontWeight: "600"}} >
                         {props.display_name}
-                    </MythicStyledTooltip>
+                    </Typography>
+                    <Typography variant={"body2"} style={{fontSize: theme.typography.pxToRem(15)}}>
+                        {props.description}
+                    </Typography>
                     {props.required ? (
-                        <Typography component="div" style={{color: theme.palette.warning.main}}>Required</Typography>
+                        <Typography component="div" color={"warning"}>Required</Typography>
                     ) : null }
                  </MythicStyledTableCell>
                 <MythicStyledTableCell>

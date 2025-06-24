@@ -16,7 +16,10 @@ import { Backdrop } from '@mui/material';
 import {CircularProgress} from '@mui/material';
 import {getDynamicQueryParams} from "./TaskParametersDialogRow";
 import {MythicAgentSVGIcon} from "../../MythicComponents/MythicAgentSVGIcon";
-import {GetMythicSetting, SetMythicSetting} from "../../MythicComponents/MythicSavedUserSetting";
+import {GetMythicSetting} from "../../MythicComponents/MythicSavedUserSetting";
+import {getSkewedNow} from "../../utilities/Time";
+import { useTheme } from '@mui/material/styles';
+import {MythicStyledTooltip} from "../../MythicComponents/MythicStyledTooltip";
 
 const GetLoadedCommandsSubscription = gql`
 subscription GetLoadedCommandsSubscription($callback_id: Int!){
@@ -88,7 +91,15 @@ subscription tasksSubscription($callback_id: Int!){
     }
 }
 `;
-
+const contextSubscription = gql`
+subscription CallbackMetadataForTasking($callback_id: Int!){
+    callback_stream(batch_size: 1, cursor: {initial_value: {timestamp: "1970-01-01"}}, where: {id: {_eq: $callback_id} }){
+        cwd
+        impersonation_context
+        extra_info
+    }
+}
+`;
 const GetUpDownArrowName = (task, useDisplayParamsForCLIHistoryUserSetting) => {
     if(task.command){
         if(task?.command?.payloadtype?.use_display_params_for_cli_history){
@@ -150,12 +161,19 @@ const IsRepeatableCLIParameterType = (parameter_type) => {
             return false;
     }
 }
+
 export function CallbacksTabsTaskingInputPreMemo(props){
     const toastId = "tasking-toast-message";
+    const theme = useTheme();
     const inputRef = React.useRef(null);
-    const snackMessageStyles = {position:"bottom-left", autoClose: 1000, style:{marginBottom: "50px"}, toastId: toastId};
-    const snackReverseSearchMessageStyles = {position:"bottom-left", autoClose: 1000, style:{marginBottom: "100px"}, toastId: toastId};
+    const snackMessageStyles = {position:"bottom-left", autoClose: 1000, toastId: toastId, style: {marginBottom: "30px"}};
+    const snackReverseSearchMessageStyles = {position:"bottom-left", autoClose: 1000,  toastId: toastId, style: {marginBottom: "70px"}};
     const [commandPayloadType, setCommandPayloadType] = React.useState("");
+    const [callbackContext, setCallbackContext] = React.useState({
+        cwd: "",
+        impersonation_context: "",
+        extra_info: "",
+    });
     const [message, setMessage] = React.useState("");
     const loadedOptions = React.useRef([]);
     const taskOptions = React.useRef([]);
@@ -170,7 +188,7 @@ export function CallbacksTabsTaskingInputPreMemo(props){
         onCompleted: (data) => {
             if(data.dynamic_query_function.status === "success"){
                 try{
-                    if(data.dynamic_query_function.choices.length > 0){
+                    if(data.dynamic_query_function.choices && data.dynamic_query_function.choices.length > 0){
                         const choices = data.dynamic_query_function.choices.filter( c => {
                             if(c.toLowerCase().includes(lastValueTypedBeforeDynamicParamsRef.current.toLowerCase())){
                                 return c;
@@ -197,6 +215,7 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                         snackActions.warning("no available options", snackMessageStyles);
                     }
                 }catch(error){
+                    console.log(error);
                     setBackdropOpen(false);
                     snackActions.warning("Failed to parse dynamic parameter results", snackMessageStyles);
                     tabOptions.current = [];
@@ -227,7 +246,8 @@ export function CallbacksTabsTaskingInputPreMemo(props){
     const commandOptionsForcePopup = React.useRef(false);
     const [openSelectCommandDialog, setOpenSelectCommandDialog] = React.useState(false);
     const me = useReactiveVar(meState);
-    const useDisplayParamsForCLIHistoryUserSetting = React.useRef(GetMythicSetting({setting_name: "useDisplayParamsForCLIHistory", default_value: "true"}));
+    const useDisplayParamsForCLIHistoryUserSetting = React.useRef(GetMythicSetting({setting_name: "useDisplayParamsForCLIHistory", default_value: true}));
+    const hideTaskingContext = React.useRef(GetMythicSetting({setting_name: "hideTaskingContext", default_value: false}));
     const forwardOrBackwardTabIndex = (event, currentIndex, options) => {
         if(event.shiftKey){
             let newIndex = currentIndex - 1;
@@ -249,6 +269,16 @@ export function CallbacksTabsTaskingInputPreMemo(props){
             tokenOptions.current = data.data.callbacktoken;
         }
       });
+    useSubscription(contextSubscription, {
+        variables: {callback_id: props.callback_id}, fetchPolicy: "network-only",
+        shouldResubscribe: true,
+        onData: ({data}) => {
+            if(!mountedRef.current || !props.parentMountedRef.current){
+                return;
+            }
+            setCallbackContext(data.data.callback_stream[0]);
+        }
+    });
     useSubscription(subscriptionTask, {
         variables: {callback_id: props.callback_id}, fetchPolicy: "network-only",
         shouldResubscribe: true,
@@ -455,11 +485,16 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                         lastValueTypedBeforeDynamicParamsRef.current = lastSuppliedParameterHasValue;
                         if (lastSuppliedParameter !== undefined && parsed[lastSuppliedParameter.cli_name] !== undefined && lastSuppliedParameterHasValue === ""){
                             if (lastSuppliedParameter.choices.length > 0){
-                                tabOptions.current = lastSuppliedParameter.choices;
+                                const choices = lastSuppliedParameter.choices.filter( c => {
+                                    if(c.toLowerCase().includes(lastValueTypedBeforeDynamicParamsRef.current.toLowerCase())){
+                                        return c;
+                                    }
+                                })
+                                tabOptions.current = choices;
                                 tabOptionsIndex.current = 0;
                                 tabOptionsType.current = "param_value";
-                                let newChoice = lastSuppliedParameter.choices[0].includes(" ") ? "\"" + lastSuppliedParameter.choices[0] + "\"" : lastSuppliedParameter.choices[0];
-                                let newMsg = message + newChoice;
+                                let newChoice = choices[0].includes(" ") ? "\"" + choices[0] + "\"" : choices[0];
+                                let newMsg = message.substring(0, message.length - lastValueTypedBeforeDynamicParamsRef.current.length) + newChoice;
                                 setMessage(newMsg);
                                 return;
                             } else if(lastSuppliedParameter.dynamic_query_function !== ""){
@@ -605,11 +640,16 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                             lastValueTypedBeforeDynamicParamsRef.current = lastSuppliedParameterHasValue;
                             if (lastSuppliedParameter !== undefined && parsed[lastSuppliedParameter.cli_name] !== undefined){
                                 if (lastSuppliedParameter.choices.length > 0){
-                                    tabOptions.current = lastSuppliedParameter.choices;
+                                    const choices = lastSuppliedParameter.choices.filter( c => {
+                                        if(c.toLowerCase().includes(lastValueTypedBeforeDynamicParamsRef.current.toLowerCase())){
+                                            return c;
+                                        }
+                                    })
+                                    tabOptions.current = choices;
                                     tabOptionsIndex.current = 0;
                                     tabOptionsType.current = "param_value";
-                                    let newChoice = lastSuppliedParameter.choices[0].includes(" ") ? "\"" + lastSuppliedParameter.choices[0] + "\"" : lastSuppliedParameter.choices[0];
-                                    let newMsg = message + newChoice;
+                                    let newChoice = choices[0].includes(" ") ? "\"" + choices[0] + "\"" : choices[0];
+                                    let newMsg = message.substring(0, message.length - lastValueTypedBeforeDynamicParamsRef.current.length) + newChoice;
                                     setMessage(newMsg);
                                     return;
                                 } else if(lastSuppliedParameter.dynamic_query_function !== ""){
@@ -708,7 +748,7 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                 taskOptionsIndex.current = -1;
             }
         }
-        if(message === ""){
+        if(message === "" && tabOptions.current.length === 0){
             setCommandPayloadType("");
         }
     }
@@ -1345,22 +1385,22 @@ export function CallbacksTabsTaskingInputPreMemo(props){
         let parsedWithPositionalParameters = {};
         let params = splitMessage.slice(1).join(" ");
         let failed_json_parse = true;
-        if(unmodifiedHistoryValue === "modal" || unmodifiedHistoryValue.includes("browserscript")){
-            // these are the two kinds that'll introduce dictionary values as original_params
-            try{
-                parsedWithPositionalParameters = JSON.parse(params);
-                cmdGroupName = determineCommandGroupName(cmd, parsedWithPositionalParameters);
-                if(cmdGroupName !== undefined){
-                    cmdGroupName.sort()
-                } else {
-                    snackActions.warning("Two or more of the specified parameters can't be used together", snackMessageStyles);
-                    return;
-                }
-                failed_json_parse = false;
-
-            }catch(error){
-                failed_json_parse = true;
+        try{
+            parsedWithPositionalParameters = JSON.parse(params);
+            if(['string', 'number', 'boolean', null].includes(typeof parsedWithPositionalParameters)){
+                throw("failed to parse json");
             }
+            cmdGroupName = determineCommandGroupName(cmd, parsedWithPositionalParameters);
+            if(cmdGroupName !== undefined){
+                cmdGroupName.sort()
+            } else {
+                snackActions.warning("Two or more of the specified parameters can't be used together", snackMessageStyles);
+                return;
+            }
+            failed_json_parse = false;
+
+        }catch(error){
+            failed_json_parse = true;
         }
         if(failed_json_parse){
             let parsed = parseCommandLine(params, cmd);
@@ -1381,7 +1421,7 @@ export function CallbacksTabsTaskingInputPreMemo(props){
             if(cmd.commandparameters.length > 0){
                 parsed["_"].unshift(cmd);
                 parsedWithPositionalParameters = fillOutPositionalArguments(cmd, parsed, cmdGroupName);
-                //console.log(parsedWithPositionalParameters);
+                console.log("what's left", parsedWithPositionalParameters);
                 if(parsedWithPositionalParameters === undefined){
                     return;
                 }
@@ -1413,6 +1453,7 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                 }
             }
             setMessage("");
+            setCommandPayloadType("");
             taskOptionsIndex.current = -1;
             reverseSearchIndex.current = -1;
             setReverseSearching(false);
@@ -1421,8 +1462,10 @@ export function CallbacksTabsTaskingInputPreMemo(props){
         }
         console.log("positional args added in:", parsedWithPositionalParameters);
         console.log("about to call onSubmitCommandLine", cmd);
+        console.log("commandOptionsForcePopup", Boolean(commandOptionsForcePopup.current), "group name", cmdGroupName)
         props.onSubmitCommandLine(message, cmd, parsedWithPositionalParameters, Boolean(commandOptionsForcePopup.current), cmdGroupName, unmodifiedHistoryValue);
         setMessage("");
+        setCommandPayloadType("");
         taskOptionsIndex.current = -1;
         reverseSearchIndex.current = -1;
         setReverseSearching(false);
@@ -1464,13 +1507,14 @@ export function CallbacksTabsTaskingInputPreMemo(props){
         setReverseSearchString(event.target.value);
         if(event.target.value.length === 0){
             setMessage("");
+            setCommandPayloadType("");
             reverseSearchOptions.current = [];
             reverseSearchIndex.current = 0;
             return;
         }
         // need to do a reverse i search through taskOptions
         const lowerCaseTextSearch = event.target.value.toLowerCase();
-        const matchingOptions = taskOptions.current.filter( x => (GetCommandName(x)).toLowerCase().includes(lowerCaseTextSearch));
+        const matchingOptions = taskOptions.current.filter( x => (GetCommandName(x) + x.original_params).toLowerCase().includes(lowerCaseTextSearch));
         const filteredMatches = matchingOptions.filter( x => applyFilteringToTasks(x))
         reverseSearchOptions.current = filteredMatches;
         if(filteredMatches.length > 0){
@@ -1537,30 +1581,56 @@ export function CallbacksTabsTaskingInputPreMemo(props){
         }
     }, [props.focus])
     return (
-        <React.Fragment>
-            <Backdrop open={backdropOpen} style={{zIndex: 2, position: "absolute"}} invisible={false}>
-                <CircularProgress color="inherit" />
+        <div style={{position: "relative"}}>
+            {backdropOpen && <Backdrop open={backdropOpen} style={{zIndex: 2, position: "absolute"}} invisible={false}>
+                <CircularProgress color="inherit" size={30}/>
             </Backdrop>
+            }
             {reverseSearching &&
                 <TextField
                     placeholder={"Search previous commands"}
-                    onKeyDown={onReverseSearchKeyDown}    
-                    onChange={handleReverseSearchInputChange}                     
+                    onKeyDown={onReverseSearchKeyDown}
+                    onChange={handleReverseSearchInputChange}
                     size="small"
                     color={"secondary"}
                     autoFocus={true}
                     variant="outlined"
                     value={reverseSearchString}
                     fullWidth={true}
-                    InputProps={{ type: 'search',
-                        startAdornment: <React.Fragment><Typography style={{width: "10%"}}>reverse-i-search:</Typography></React.Fragment>
+                    InputProps={{
+                        type: 'search',
+                        startAdornment: <React.Fragment><Typography
+                            style={{width: "10%"}}>reverse-i-search:</Typography></React.Fragment>
                     }}
                 />
             }
+            {callbackContext?.impersonation_context !== "" && !hideTaskingContext.current &&
+                <MythicStyledTooltip title={"Impersonation Context"}>
+                    <span className={"rounded-tab"} style={{backgroundColor: theme.taskContextImpersonationColor}}>
+                        <b>{"User: "}</b>{callbackContext.impersonation_context}
+                    </span>
+                </MythicStyledTooltip>
+
+            }
+            {callbackContext?.cwd !== "" && !hideTaskingContext.current &&
+                <MythicStyledTooltip title={"Current Working Directory"}>
+                    <span className={"rounded-tab"} style={{backgroundColor: theme.taskContextCwdColor}}>
+                        <b>{"Dir: "}</b>{callbackContext.cwd}
+                    </span>
+                </MythicStyledTooltip>
+            }
+            {callbackContext?.extra_info !== "" && !hideTaskingContext.current &&
+                <MythicStyledTooltip title={"Extra Callback Context"}>
+                    <span className={"rounded-tab"} style={{backgroundColor: theme.taskContextExtraColor}}>
+                        {callbackContext.extra_info}
+                    </span>
+                </MythicStyledTooltip>
+
+            }
             <TextField
                 placeholder={"Task an agent..."}
-                onKeyDown={onKeyDown}    
-                onChange={handleInputChange}                     
+                onKeyDown={onKeyDown}
+                onChange={handleInputChange}
                 size="small"
                 color={"secondary"}
                 variant="outlined"
@@ -1578,54 +1648,70 @@ export function CallbacksTabsTaskingInputPreMemo(props){
                     autoFocus: true,
                     style: {paddingTop: "0px", paddingBottom: "0px", paddingRight: "5px"},
                     endAdornment:
-                    <React.Fragment>
-                    <IconButton
-                        color="info"
-                        variant="contained"
-                        disableRipple={true}
-                        disableFocusRipple={true}
-                        onClick={onSubmitCommandLine}
-                        size="large"><SendIcon/></IconButton>
-                    {props.filterTasks &&
-                        <IconButton
-                            color={activeFiltering ? "warning" : "secondary"}
-                            variant="contained"
-                            onClick={onClickFilter}
-                            style={{paddingLeft: 0}}
-                            disableRipple={true}
-                            disableFocusRipple={true}
-                            size="large"><TuneIcon/></IconButton>
-                    }
-                        {commandPayloadType !== "" &&
-                            <MythicAgentSVGIcon payload_type={commandPayloadType}
-                                                style={{width: "35px", height: "35px"}}/>
-                        }
-                    </React.Fragment>
+                        <React.Fragment>
+                            <IconButton
+                                color="info"
+                                variant="contained"
+                                disableRipple={true}
+                                disableFocusRipple={true}
+                                onClick={onSubmitCommandLine}
+                                size="large"><SendIcon/>
+                            </IconButton>
+                            {props.filterTasks &&
+                                <IconButton
+                                    color={activeFiltering ? "warning" : "secondary"}
+                                    variant="contained"
+                                    onClick={onClickFilter}
+                                    style={{paddingLeft: 0}}
+                                    disableRipple={true}
+                                    disableFocusRipple={true}
+                                    size="large"><TuneIcon/></IconButton>
+                            }
+                            {commandPayloadType !== "" &&
+                                <MythicAgentSVGIcon payload_type={commandPayloadType}
+                                                    style={{width: "35px", height: "35px"}}/>
+                            }
+                        </React.Fragment>
                     ,
                     startAdornment: <React.Fragment>
                         {tokenOptions.current.length > 0 ? (
-                            <CallbacksTabsTaskingInputTokenSelect options={tokenOptions.current} changeSelectedToken={props.changeSelectedToken}/>
+                            <CallbacksTabsTaskingInputTokenSelect options={tokenOptions.current}
+                                                                  changeSelectedToken={props.changeSelectedToken}/>
                         ) : null}
-                        
+
                     </React.Fragment>
-                
+
                 }}
-                />
-              {openFilterOptionsDialog &&
-                <MythicDialog fullWidth={true} maxWidth="md" open={openFilterOptionsDialog} 
-                    onClose={()=>{setOpenFilterOptionsDialog(false);}} 
-                    innerDialog={<CallbacksTabsTaskingFilterDialog filterCommandOptions={loadedOptions.current} onSubmit={props.onSubmitFilter} filterOptions={props.filterOptions} onClose={()=>{setOpenFilterOptionsDialog(false);}} />}
-                />
-              }
-            {openSelectCommandDialog &&
-                <MythicDialog fullWidth={true} maxWidth="md" open={openSelectCommandDialog}
-                              onClose={()=>{setOpenSelectCommandDialog(false)}}
-                              innerDialog={<MythicSelectFromListDialog onClose={()=>{setOpenSelectCommandDialog(false);}}
-                                                                       onSubmit={processCommandAndCommandLine} options={commandOptions.current} title={"Select Command"}
-                                                                       action={"select"} identifier={"id"} display={"display"} />}
+            />
+            {openFilterOptionsDialog &&
+                <MythicDialog fullWidth={true} maxWidth="md" open={openFilterOptionsDialog}
+                              onClose={() => {
+                                  setOpenFilterOptionsDialog(false);
+                              }}
+                              innerDialog={<CallbacksTabsTaskingFilterDialog
+                                  filterCommandOptions={loadedOptions.current} onSubmit={props.onSubmitFilter}
+                                  filterOptions={props.filterOptions} onClose={() => {
+                                  setOpenFilterOptionsDialog(false);
+                              }}/>}
                 />
             }
-        </React.Fragment>
+            {openSelectCommandDialog &&
+                <MythicDialog fullWidth={true} maxWidth="md" open={openSelectCommandDialog}
+                              onClose={() => {
+                                  setOpenSelectCommandDialog(false)
+                              }}
+                              innerDialog={<MythicSelectFromListDialog onClose={() => {
+                                  setOpenSelectCommandDialog(false);
+                              }}
+                                                                       onSubmit={processCommandAndCommandLine}
+                                                                       options={commandOptions.current}
+                                                                       title={"Select Command"}
+                                                                       action={"select"} identifier={"id"}
+                                                                       display={"display"}/>}
+                />
+            }
+        </div>
     );
 }
+
 export const CallbacksTabsTaskingInput = React.memo(CallbacksTabsTaskingInputPreMemo);

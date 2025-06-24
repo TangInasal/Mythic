@@ -3,7 +3,7 @@ import { styled } from '@mui/material/styles';
 import {IconButton, Link} from '@mui/material';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import {getSkewedNow, toLocalTime} from '../../utilities/Time';
+import {getSkewedNow, toLocalTime, toLocalTimeShort} from '../../utilities/Time';
 import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -19,6 +19,10 @@ import {GetMythicSetting} from "../../MythicComponents/MythicSavedUserSetting";
 import PlayCircleFilledTwoToneIcon from '@mui/icons-material/PlayCircleFilledTwoTone';
 import CropRotateTwoToneIcon from '@mui/icons-material/CropRotateTwoTone';
 import {MythicStyledTooltip} from "../../MythicComponents/MythicStyledTooltip";
+import {operatorSettingDefaults} from "../../../cache";
+import {TaskFromUIButton} from "./TaskFromUIButton";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {faSkullCrossbones} from '@fortawesome/free-solid-svg-icons';
 
 
 const PREFIX = 'TaskDisplay';
@@ -65,10 +69,11 @@ export const StyledPaper = styled(Paper)((
     WebkitBoxOrient: "vertical",
     cursor: "default",
     wordBreak: "break-all",
+    //color: theme.taskPromptTextColor,
   },
   [`& .${classes.secondaryHeading}`]: {
     fontSize: theme.typography.pxToRem(15),
-    //color: theme.palette.text.secondary,
+    //color: theme.taskPromptTextColor,
     overflow: "auto",
     display: "block",
     textOverflow: "ellipsis",
@@ -77,7 +82,7 @@ export const StyledPaper = styled(Paper)((
   },
   [`& .${classes.taskAndTimeDisplay}`]: {
     fontSize: theme.typography.pxToRem(12),
-    color: theme.palette.text.secondary,
+    color: theme.taskPromptTextColor,
     overflow: "hidden",
     textOverflow: "ellipsis",
     maxWidth: "100%",
@@ -88,7 +93,7 @@ export const StyledPaper = styled(Paper)((
   },
   [`& .${classes.secondaryHeadingExpanded}`]: {
     fontSize: theme.typography.pxToRem(15),
-    //color: theme.palette.text.secondary,
+    //color: theme.taskPromptTextColor,
     display: "block",
     overflow: "auto",
     maxWidth: "100%",
@@ -219,7 +224,9 @@ const ColoredTaskDisplay = ({task, theme, children, expanded}) => {
     }
   }, [task.status, task.completed])
     return(
-      <span style={{display: "flex", margin: 0, borderWidth: 0, padding: 0, minHeight: "48px", alignItems: "center", height: "100%", borderLeft: "6px solid " + themeColor, paddingLeft: "5px", width: "100%", borderTopLeftRadius: "4px", borderBottomLeftRadius: expanded ? 0 : "4px"}}>
+      <span style={{display: "flex", margin: 0, borderWidth: 0, padding: 0, minHeight: "48px", alignItems: "center",
+        height: "100%", borderLeft: "6px solid " + themeColor, paddingLeft: "5px", width: "100%",
+        borderTopLeftRadius: "4px", borderBottomLeftRadius: expanded ? 0 : "4px"}}>
         {children}
       </span>
     )
@@ -228,16 +235,19 @@ const GetOperatorDisplay = ({initialHideUsernameValue, task}) => {
   if(initialHideUsernameValue){
     return '';
   }
-  return "/ " + task.operator.username;
+  return task.operator.username;
 }
 export const ColoredTaskLabel = ({task, theme, me, taskDivID, onClick, displayChildren, toggleDisplayChildren, expanded }) => {
   const [displayComment, setDisplayComment] = React.useState(false);
   const [alertBadges, setAlertBadges] = React.useState(0);
-  const initialHideUsernameValue = GetMythicSetting({setting_name: "hideUsernames", default_value: false});
-  const initialShowIPValue = GetMythicSetting({setting_name: "showIP", default_value: false});
+  const initialHideUsernameValue = GetMythicSetting({setting_name: "hideUsernames", default_value: operatorSettingDefaults.hideUsernames});
+  const initialShowIPValue = GetMythicSetting({setting_name: "showIP", default_value: operatorSettingDefaults.showIP});
   const ipValue = JSON.parse(task.callback.ip)[0];
-  const initialShowHostnameValue = GetMythicSetting({setting_name: "showHostname", default_value: false});
-  const initialShowCallbackGroupsValue = GetMythicSetting({setting_name: "showCallbackGroups", default_value: false});
+  const initialShowHostnameValue = GetMythicSetting({setting_name: "showHostname", default_value: operatorSettingDefaults.showHostname});
+  const initialShowCallbackGroupsValue = GetMythicSetting({setting_name: "showCallbackGroups", default_value: operatorSettingDefaults.showCallbackGroups});
+  const initialTaskTimestampDisplayField = GetMythicSetting({setting_name: "taskTimestampDisplayField", default_value: operatorSettingDefaults.taskTimestampDisplayField});
+  const displayTimestamp = task[initialTaskTimestampDisplayField] ? task[initialTaskTimestampDisplayField] : task.timestamp;
+  const [openKillTaskButton, setOpenKillTaskButton] = React.useState({open: false});
   const toggleDisplayComment = (evt) => {
     evt.stopPropagation();
     setDisplayComment(!displayComment);
@@ -252,19 +262,24 @@ export const ColoredTaskLabel = ({task, theme, me, taskDivID, onClick, displayCh
     }
     //preventPropagation(e);
   }
-
+  const onClickKillIcon = (e, open) => {
+    if(e){
+      e.stopPropagation();
+    }
+    setOpenKillTaskButton({open: open});
+  }
   return (
       <ColoredTaskDisplay task={task} theme={theme} expanded={expanded}  >
         <div id={taskDivID} style={{width: "100%"}}>
-          {displayComment ? (
+          {displayComment && (
               <React.Fragment>
                 <Typography className={classes.taskAndTimeDisplay} onClick={preventPropagation}>{task.commentOperator.username}</Typography><br/>
                 <Typography className={classes.heading} onClick={preventPropagation}>{task.comment}</Typography>
               </React.Fragment>
-          ) : null}
+          )}
           <div style={{lineHeight: 0}}>
             <Typography className={classes.taskAndTimeDisplay} onClick={preventPropagation}>
-              [{toLocalTime(task.timestamp, me?.user?.view_utc_time || false)}]
+              [{toLocalTime(displayTimestamp, me?.user?.view_utc_time || false)}]
               {" / "}
               <span style={{}}>
                   {task.has_intercepted_response &&
@@ -296,16 +311,27 @@ export const ColoredTaskLabel = ({task, theme, me, taskDivID, onClick, displayCh
                     </>
                 }
                   <MythicStyledTooltip title={"View Task in separate page"} >
-                    <Link style={{wordBreak: "break-all"}} color={"textPrimary"} underline={"always"} target={"_blank"}
+                    <Link style={{wordBreak: "break-all", color: theme.taskPromptTextColor,}} underline={"always"} target={"_blank"}
                           href={"/new/task/" + task.display_id}>T-{task.display_id}</Link>
                   </MythicStyledTooltip>
-
+                {!task.completed && task.status_timestamp_processing &&
+                    <>
+                      <MythicStyledTooltip title={"Task the agent to kill this task"} >
+                        <IconButton style={{padding: 0}} onClick={(e) => onClickKillIcon(e, true)}
+                                    color="inherit" disableFocusRipple={true}
+                                    disableRipple={true}>
+                          <FontAwesomeIcon size={"sm"} icon={faSkullCrossbones}
+                                           style={{cursor: "pointer", height: "15px", marginLeft: "5px"}} />
+                        </IconButton>
+                      </MythicStyledTooltip>
+                    </>
+                }
               </span>
-              {" "}
+              {" / "}
               <GetOperatorDisplay initialHideUsernameValue={initialHideUsernameValue} task={task}/>
               {" / "}
               <MythicStyledTooltip title={"View Callback in separate page"}>
-                <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" target="_blank"
+                <Link style={{wordBreak: "break-all", color: theme.taskPromptTextColor}} underline="always" target="_blank"
                       href={"/new/callbacks/" + task.callback.display_id}>C-{task.callback.display_id}</Link>
               </MythicStyledTooltip>
 
@@ -340,7 +366,7 @@ export const ColoredTaskLabel = ({task, theme, me, taskDivID, onClick, displayCh
                                      enterDelay={2000}
                     placement={"top"}
                     title={(task?.command?.cmd || task.command_name) + " " + task.display_params} >
-                  <Typography className={classes.heading} onClick={onLocalClick} >
+                  <Typography className={classes.heading} style={{color: theme.taskPromptCommandTextColor}} onClick={onLocalClick} >
                     {(task?.command?.cmd || task.command_name) + " " + task.display_params}
                   </Typography>
                 </MythicStyledTooltip>
@@ -348,6 +374,17 @@ export const ColoredTaskLabel = ({task, theme, me, taskDivID, onClick, displayCh
             </div>
           </div>
         </div>
+        {openKillTaskButton.open &&
+            <TaskFromUIButton ui_feature={"task:job_kill"}
+                              callback_id={task.callback?.id}
+                              display_id={task.callback?.display_id}
+                              parameters={task.agent_task_id}
+                              openDialog={false}
+                              getConfirmation={true}
+                              acceptText={"KILL JOB"}
+                              selectCallback={false}
+                              onTasked={({tasked}) => onClickKillIcon(null, false)}/>
+        }
       </ColoredTaskDisplay>
   )
 }
@@ -356,7 +393,9 @@ const TaskRow = ({task, filterOptions, me, newlyIssuedTasks, indentLevel, collap
     const [taskingData, setTaskingData] = React.useState([]);
     const [shouldDisplay, setShouldDisplay] = React.useState(true);
     const [displayChildren, setDisplayChildren] = React.useState(false);
-    useSubscription(getSubTaskingQuery, {
+    const hideBrowserTasking = GetMythicSetting({setting_name: "hideBrowserTasking", default_value: operatorSettingDefaults.hideBrowserTasking});
+
+  useSubscription(getSubTaskingQuery, {
       variables: {task_id: task.id},
       onData:  ({data}) => {
         //console.log(subscriptionData);
@@ -383,6 +422,10 @@ const TaskRow = ({task, filterOptions, me, newlyIssuedTasks, indentLevel, collap
       "parameterString": onlyParameters,
       "hideErrors": hideErrors
     }); */
+      if(hideBrowserTasking && task.tasking_location.includes("browser")){
+        setShouldDisplay(false);
+        return;
+      }
       if(task.display_params.includes("help") && task.operator.username !== me.user.username){
         setShouldDisplay(false);
         return;
@@ -492,6 +535,8 @@ const TaskRowFlat = ({task, filterOptions, me, onSelectTask, showOnSelectTask, s
   const [taskingData, setTaskingData] = React.useState([]);
   const [shouldDisplay, setShouldDisplay] = React.useState(true);
   const [displayChildren, setDisplayChildren] = React.useState(false);
+  const hideBrowserTasking = GetMythicSetting({setting_name: "hideBrowserTasking", default_value: operatorSettingDefaults.hideBrowserTasking});
+
   useSubscription(getSubTaskingQuery, {
     variables: {task_id: task.id},
     onData:  ({data}) => {
@@ -517,6 +562,10 @@ const TaskRowFlat = ({task, filterOptions, me, onSelectTask, showOnSelectTask, s
     "everythingButList": everythingBut,
     "parameterString": onlyParameters
   }); */
+    if(hideBrowserTasking && task.tasking_location.includes("browser")){
+      setShouldDisplay(false);
+      return;
+    }
     if(task.display_params.includes("help") && task.operator.username !== me.user.username){
       setShouldDisplay(false);
       return;
@@ -628,124 +677,6 @@ const TaskRowFlat = ({task, filterOptions, me, onSelectTask, showOnSelectTask, s
       )
   )
 }
-const TaskRowConsole = ({task, filterOptions, me, newlyIssuedTasks, indentLevel}) => {
-  const [dropdownOpen, setDropdownOpen] = React.useState(false);
-  const [taskingData, setTaskingData] = React.useState([]);
-  const [shouldDisplay, setShouldDisplay] = React.useState(true);
-  useSubscription(getSubTaskingQuery, {
-    variables: {task_id: task.id},
-    onData:  ({data}) => {
-      //console.log(subscriptionData);
-      // need to merge in the tasking data
-      const newTaskingData = data.data.task_stream.reduce( (prev, cur) => {
-        for(let i = 0; i < prev.length; i++){
-          if(prev[i].id === cur.id){
-            prev[i] = {...cur}
-            return prev;
-          }
-        }
-        return [...prev, cur];
-      }, [...taskingData]);
-      newTaskingData.sort( (a,b) => a.id < b.id ? -1 : 1);
-      setTaskingData(newTaskingData);
-    }
-  });
-  useEffect( () => {
-    /*props.onSubmit({
-    "operatorsList": onlyOperators,
-    "commentsFlag": onlyHasComments,
-    "commandsList": onlyCommands,
-    "everythingButList": everythingBut,
-    "parameterString": onlyParameters,
-    "hideErrors": hideErrors
-  }); */
-    if(task.display_params.includes("help") && task.operator.username !== me.user.username){
-      setShouldDisplay(false);
-      return;
-    }
-    if(filterOptions === undefined){
-      if(!shouldDisplay){
-        setShouldDisplay(true);
-      }
-      return;
-    }
-    if(filterOptions["operatorsList"].length > 0){
-      if(!filterOptions["operatorsList"].includes(task.operator.username)){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(filterOptions["commentsFlag"]){
-      if(task.comment === ""){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(filterOptions["commandsList"].length > 0){
-      // only show these commands
-      if(!filterOptions["commandsList"].includes(task.command_name)){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(filterOptions["everythingButList"].length > 0){
-      if(filterOptions["everythingButList"].includes(task.command_name)){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(filterOptions["parameterString"] !== ""){
-      let regex = new RegExp(filterOptions["parameterString"]);
-      if(!regex.test(task.display_params)){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(filterOptions["hideErrors"]){
-      if(task.status.includes("error")){
-        if(shouldDisplay){
-          setShouldDisplay(false);
-        }
-        return;
-      }
-    }
-    if(!shouldDisplay){
-      setShouldDisplay(true);
-    }
-  }, [filterOptions, task.comment, task.command, task.display_params, task.operator.username]);
-  const toggleTaskDropdown = React.useCallback( (event, expanded) => {
-    if(window.getSelection().toString() !== ""){
-      return;
-    }
-    setDropdownOpen(!dropdownOpen);
-  }, [dropdownOpen]);
-
-  return (
-      shouldDisplay ? (
-          <div style={{marginLeft: (indentLevel * 10) + "px"}}>
-            <TaskLabelConsole me={me} task={task} newlyIssuedTasks={newlyIssuedTasks} />
-            {
-              taskingData.map( (tsk) => (
-                  <TaskRowConsole key={"taskrow: " + tsk.id} me={me} task={tsk}
-                           filterOptions={filterOptions} indentLevel={indentLevel+1}/>
-              ))
-            }
-          </div>
-
-      ) : null
-  )
-}
-
 const TaskLabel = ({task, dropdownOpen, toggleTaskDropdown, me, newlyIssuedTasks, displayChildren, toggleDisplayChildren}) => {
   const [fromNow, setFromNow] = React.useState(getSkewedNow());
   const theme = useTheme();
@@ -857,6 +788,216 @@ export const TaskLabelFlat = ({task, me, showOnSelectTask, onSelectTask, graphVi
       </StyledPaper>
   )
 }
+
+
+const ColoredTaskDisplayConsole = ({task, theme, children, expanded}) => {
+  const [themeColor, setThemeColor] = React.useState(theme.palette.info.main);
+  useEffect( () => {
+    if(task.status.toLowerCase().includes("error")){
+      setThemeColor(theme.palette.error.main);
+    }else if(task.status.toLowerCase() === "cleared"){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status === "submitted"){
+      setThemeColor(theme.palette.info.main);
+    }else if(task.opsec_pre_blocked && !task.opsec_pre_bypassed){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.opsec_post_blocked && !task.opsec_post_bypassed){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status.toLowerCase().includes("processing")){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status === "completed" || (task.status === "success" && task.completed)){
+      setThemeColor(theme.palette.success.main);
+    }else{
+      setThemeColor(theme.palette.info.main);
+    }
+  }, [task.status, task.completed])
+  return(
+      <span style={{display: "flex", margin: 0, borderWidth: 0, padding: 0, minHeight: "30px", alignItems: "center",
+        height: "100%", paddingLeft: "5px", width: "100%",
+        borderTopLeftRadius: "4px", borderBottomLeftRadius: expanded ? 0 : "4px"}}>
+        {children}
+      </span>
+  )
+}
+const TaskRowConsole = ({task, filterOptions, me, newlyIssuedTasks, indentLevel}) => {
+  const [taskingData, setTaskingData] = React.useState([]);
+  const [shouldDisplay, setShouldDisplay] = React.useState(true);
+  const hideBrowserTasking = GetMythicSetting({setting_name: "hideBrowserTasking", default_value: operatorSettingDefaults.hideBrowserTasking});
+
+  useSubscription(getSubTaskingQuery, {
+    variables: {task_id: task.id},
+    onData:  ({data}) => {
+      //console.log(subscriptionData);
+      // need to merge in the tasking data
+      const newTaskingData = data.data.task_stream.reduce( (prev, cur) => {
+        for(let i = 0; i < prev.length; i++){
+          if(prev[i].id === cur.id){
+            prev[i] = {...cur}
+            return prev;
+          }
+        }
+        return [...prev, cur];
+      }, [...taskingData]);
+      newTaskingData.sort( (a,b) => a.id < b.id ? -1 : 1);
+      setTaskingData(newTaskingData);
+    }
+  });
+  useEffect( () => {
+    /*props.onSubmit({
+    "operatorsList": onlyOperators,
+    "commentsFlag": onlyHasComments,
+    "commandsList": onlyCommands,
+    "everythingButList": everythingBut,
+    "parameterString": onlyParameters,
+    "hideErrors": hideErrors
+  }); */
+    if(hideBrowserTasking && task.tasking_location.includes("browser")){
+      setShouldDisplay(false);
+      return;
+    }
+    if(task.display_params.includes("help") && task.operator.username !== me.user.username){
+      setShouldDisplay(false);
+      return;
+    }
+    if(filterOptions === undefined){
+      if(!shouldDisplay){
+        setShouldDisplay(true);
+      }
+      return;
+    }
+    if(filterOptions["operatorsList"].length > 0){
+      if(!filterOptions["operatorsList"].includes(task.operator.username)){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(filterOptions["commentsFlag"]){
+      if(task.comment === ""){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(filterOptions["commandsList"].length > 0){
+      // only show these commands
+      if(!filterOptions["commandsList"].includes(task.command_name)){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(filterOptions["everythingButList"].length > 0){
+      if(filterOptions["everythingButList"].includes(task.command_name)){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(filterOptions["parameterString"] !== ""){
+      let regex = new RegExp(filterOptions["parameterString"]);
+      if(!regex.test(task.display_params)){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(filterOptions["hideErrors"]){
+      if(task.status.includes("error")){
+        if(shouldDisplay){
+          setShouldDisplay(false);
+        }
+        return;
+      }
+    }
+    if(!shouldDisplay){
+      setShouldDisplay(true);
+    }
+  }, [filterOptions, task.comment, task.command, task.display_params, task.operator.username]);
+  // marginLeft: (indentLevel * 10) + "px"
+  return (
+      shouldDisplay ? (
+          <div style={{}}>
+            <TaskLabelConsole me={me} task={task} newlyIssuedTasks={newlyIssuedTasks} />
+            {
+              taskingData.map( (tsk) => (
+                  <TaskRowConsole key={"taskrow: " + tsk.id} me={me} task={tsk}
+                                  filterOptions={filterOptions} indentLevel={indentLevel+1}/>
+              ))
+            }
+          </div>
+
+      ) : null
+  )
+}
+export const ColoredTaskLabelConsole = ({task, theme, me, taskDivID, onClick, displayChildren, toggleDisplayChildren, expanded }) => {
+  const initialHideUsernameValue = GetMythicSetting({setting_name: "hideUsernames", default_value: operatorSettingDefaults.hideUsernames});
+  const initialTaskTimestampDisplayField = GetMythicSetting({setting_name: "taskTimestampDisplayField", default_value: operatorSettingDefaults.taskTimestampDisplayField});
+  const displayTimestamp = task[initialTaskTimestampDisplayField] ? task[initialTaskTimestampDisplayField] : task.timestamp;
+  const [openKillTaskButton, setOpenKillTaskButton] = React.useState({open: false});
+  const preventPropagation = (e) => {
+    e.stopPropagation();
+    //e.preventDefault();
+  }
+  const onClickKillIcon = (e, open) => {
+    if(e){
+      e.stopPropagation();
+    }
+    setOpenKillTaskButton({open: open});
+  }
+  const [themeColor, setThemeColor] = React.useState(theme.palette.info.main);
+  useEffect( () => {
+    if(task.status.toLowerCase().includes("error")){
+      setThemeColor(theme.palette.error.main);
+    }else if(task.status.toLowerCase() === "cleared"){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status === "submitted"){
+      setThemeColor(theme.palette.info.main);
+    }else if(task.opsec_pre_blocked && !task.opsec_pre_bypassed){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.opsec_post_blocked && !task.opsec_post_bypassed){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status.toLowerCase().includes("processing")){
+      setThemeColor(theme.palette.warning.main);
+    }else if(task.status === "completed" || (task.status === "success" && task.completed)){
+      setThemeColor(theme.palette.success.main);
+    }else{
+      setThemeColor(theme.palette.info.main);
+    }
+  }, [task.status, task.completed])
+  return (
+      <ColoredTaskDisplayConsole task={task} theme={theme} expanded={expanded}  >
+        <div id={taskDivID} style={{width: "100%"}}>
+          <div style={{lineHeight: 0, display: "flex", alignItems: "center"}}>
+            <Typography style={{display: "inline-block"}} sx={{color: theme.taskPromptTextColor}} onClick={preventPropagation}>
+              [{toLocalTimeShort(displayTimestamp, me?.user?.view_utc_time || false)}]
+              {" "}
+              <GetOperatorDisplay initialHideUsernameValue={initialHideUsernameValue} task={task}/>
+            </Typography>
+            <Typography style={{display: "inline-block", marginLeft: "5px"}} color={themeColor}>
+              <MythicStyledTooltip title={task.status}>
+                <b>{">_"}</b>
+              </MythicStyledTooltip>
+            </Typography>
+            <MythicStyledTooltip maxWidth={"calc(80vw)"}
+                                 enterDelay={2000}
+                                 placement={"top"}
+                                 title={(task?.command?.cmd || task.command_name) + " " + task.display_params}>
+              <Typography className={classes.heading} style={{marginLeft: "10px", color: theme.taskPromptCommandTextColor}} >
+                <b>{(task?.command?.cmd || task.command_name)}</b>{ " " + task.display_params}
+              </Typography>
+            </MythicStyledTooltip>
+          </div>
+
+        </div>
+      </ColoredTaskDisplayConsole>
+  )
+}
 const TaskLabelConsole = ({task, me}) => {
   const theme = useTheme();
   useLayoutEffect( () => {
@@ -880,9 +1021,10 @@ const TaskLabelConsole = ({task, me}) => {
   }
 
   return (
-      <StyledPaper className={classes.root + " no-box-shadow"} elevation={5} style={{marginRight: 0}} id={`taskHeader-${task.id}`}>
-          <ColoredTaskLabel theme={theme} task={task} me={me} taskDivID={`scrolltotaskconsole${task.id}`} expanded={true}/>
+      <StyledPaper className={classes.root + " no-box-shadow no-border"} elevation={5} style={{marginRight: 0, marginBottom: "5px"}} id={`taskHeader-${task.id}`}>
+          <ColoredTaskLabelConsole theme={theme} task={task} me={me} taskDivID={`scrolltotaskconsole${task.id}`} expanded={true}/>
           <TaskDisplayContainerConsole me={me} task={task} />
+          <div style={{borderBottom: "1px dashed grey", width: "100%", height: "5px", marginTop: "5px"}}/>
       </StyledPaper>
   );
 }

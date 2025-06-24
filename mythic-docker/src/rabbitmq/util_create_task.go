@@ -14,9 +14,11 @@ import (
 	"github.com/its-a-feature/Mythic/logging"
 	"github.com/its-a-feature/Mythic/utils"
 	"github.com/mitchellh/mapstructure"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 )
 
@@ -331,6 +333,7 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 		err = database.DB.Select(&loadedCommands, `SELECT
 			command.id "command.id", 
 			command.attributes "command.attributes",
+			command.supported_ui_features "command.supported_ui_features",
 			payloadtype.name "command.payloadtype.name"
 			FROM loadedcommands 
 			JOIN command ON loadedcommands.command_id = command.id
@@ -369,6 +372,11 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 		}
 		task.CommandID.Int64 = int64(task.Command.ID)
 		task.CommandID.Valid = true
+		if createTaskInput.PayloadType != nil && *createTaskInput.PayloadType != "" {
+			task.CommandPayloadType = *createTaskInput.PayloadType
+		} else {
+			task.CommandPayloadType = task.Command.Payloadtype.Name
+		}
 		// if the operator has a command block list applied, make sure they can issue this task
 		if createTaskInput.DisabledCommandID != nil {
 			err = database.DB.Get(&baseBlockedCommandsProfile, `SELECT
@@ -438,6 +446,11 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 			return response
 		}
 	}
+	if task.IsInteractiveTask {
+		task.Status = PT_TASK_FUNCTION_STATUS_SUBMITTED
+	} else {
+		task.Status = PT_TASK_FUNCTION_STATUS_OPSEC_PRE
+	}
 	if createTaskInput.TaskingLocation == nil {
 		task.TaskingLocation = "command_line"
 	} else {
@@ -455,11 +468,6 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 	}
 	if createTaskInput.GroupCallbackFunction != nil {
 		task.GroupCallbackFunction = *createTaskInput.GroupCallbackFunction
-	}
-	if task.IsInteractiveTask {
-		task.Status = PT_TASK_FUNCTION_STATUS_SUBMITTED
-	} else {
-		task.Status = PT_TASK_FUNCTION_STATUS_OPSEC_PRE
 	}
 	if createTaskInput.Token != nil && *createTaskInput.Token > 0 {
 		token := databaseStructs.Token{}
@@ -496,6 +504,10 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 		return response
 		// make sure the command is loaded into this callback
 	}
+	supportedUIFeatures := task.Command.SupportedUiFeatures.StructStringValue()
+	if utils.SliceContains(supportedUIFeatures, PT_TASK_SUPPORTED_UI_FEATURE_TASK_PROCESS_INTERACTIVE_TASKS) {
+		task.Status = PT_TASK_CREATE_TASKING
+	}
 	err = addTaskToDatabase(&task)
 	if err != nil {
 		response.Error = "Failed to create task in database"
@@ -509,14 +521,19 @@ func CreateTask(createTaskInput CreateTaskInput) CreateTaskResponse {
 		TaskID:      task.ID,
 	}
 	if task.IsInteractiveTask {
-		go submittedTasksAwaitingFetching.addTask(task)
-		return CreateTaskResponse{
-			Status:        "success",
-			TaskID:        task.ID,
-			TaskDisplayID: task.DisplayID,
+		if utils.SliceContains(supportedUIFeatures, PT_TASK_SUPPORTED_UI_FEATURE_TASK_PROCESS_INTERACTIVE_TASKS) {
+			go submitTaskToContainerCreateTasking(task.ID)
+		} else {
+			go submittedTasksAwaitingFetching.addTask(task)
 		}
+	} else {
+		go submitTaskToContainerOpsecPre(task.ID)
 	}
-	return submitTaskToContainer(task.ID)
+	return CreateTaskResponse{
+		Status:        "success",
+		TaskID:        task.ID,
+		TaskDisplayID: task.DisplayID,
+	}
 }
 
 func associateUploadedFilesWithTask(task *databaseStructs.Task, files []string) {
@@ -547,28 +564,38 @@ func addTaskToDatabase(task *databaseStructs.Task) error {
 		logging.LogError(err, "Failed to lock callback table")
 		return err
 	}
-	if statement, err := transaction.PrepareNamed(`INSERT INTO task 
+	statement, err := transaction.PrepareNamed(`INSERT INTO task 
 	(agent_task_id,command_name,callback_id,operator_id,command_id,token_id,params,
 		original_params,display_params,status,tasking_location,parameter_group_name,
 		parent_task_id,subtask_callback_function,group_callback_function,subtask_group_name,operation_id,
-	    is_interactive_task, interactive_task_type, eventstepinstance_id, status_timestamp_submitted)
+	    is_interactive_task, interactive_task_type, eventstepinstance_id, status_timestamp_submitted,
+	 command_payload_type)
 		VALUES (:agent_task_id, :command_name, :callback_id, :operator_id, :command_id, :token_id, :params,
 			:original_params, :display_params, :status, :tasking_location, :parameter_group_name,
 			:parent_task_id, :subtask_callback_function, :group_callback_function, :subtask_group_name, :operation_id,
-		        :is_interactive_task, :interactive_task_type, :eventstepinstance_id, :status_timestamp_submitted)
-			RETURNING id`); err != nil {
+		        :is_interactive_task, :interactive_task_type, :eventstepinstance_id, :status_timestamp_submitted,
+		        :command_payload_type)
+			RETURNING id`)
+	if err != nil {
 		logging.LogError(err, "Failed to make a prepared statement for new task creation")
 		return err
-	} else if err := statement.Get(&task.ID, task); err != nil {
+	}
+	err = statement.Get(&task.ID, task)
+	if err != nil {
 		logging.LogError(err, "Failed to create new task in database")
 		return err
-	} else if err = transaction.Commit(); err != nil {
+	}
+	err = transaction.Commit()
+	if err != nil {
 		logging.LogError(err, "Failed to commit transaction of creating new callback")
 		return err
-	} else {
-		go emitTaskLog(task.ID)
-		return nil
 	}
+	go emitTaskLog(task.ID)
+	err = database.DB.Get(&task.DisplayID, `SELECT display_id FROM task WHERE id=$1`, task.ID)
+	if err != nil {
+		logging.LogError(err, "Failed to get task display ID from task table")
+	}
+	return nil
 }
 
 func handleClearCommand(createTaskInput CreateTaskInput, callback databaseStructs.Callback, task databaseStructs.Task) CreateTaskResponse {
@@ -661,6 +688,7 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 		Error:  "not implemented",
 	}
 	task.Status = "processing"
+	outputFields := [][]string{}
 	if err := addTaskToDatabase(&task); err != nil {
 		logging.LogError(err, "Failed to add task to database")
 		output.Error = err.Error()
@@ -689,8 +717,21 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 	}
 	if task.Params == "" {
 		// looking for help about all loaded commands
-		responseUserOutput := "Loaded Commands In Agent:\n"
-		for _, cmd := range loadedCommands {
+		addedHelp := false
+		addedClear := false
+		for i, cmd := range loadedCommands {
+			if !addedClear && "clear" > cmd.Command.Cmd && i+1 < len(loadedCommands) && "clear" < loadedCommands[i+1].Command.Cmd {
+				outputFields = append(outputFields, []string{
+					"clear", "clear { | all | task Num}", "The 'clear' command will mark tasks as 'cleared' so that they can't be picked up by agents",
+				})
+				addedClear = true
+			}
+			if !addedHelp && "help" > cmd.Command.Cmd && i+1 < len(loadedCommands) && "help" < loadedCommands[i+1].Command.Cmd {
+				outputFields = append(outputFields, []string{
+					"help", "help [command]", "The 'help' command gives detailed information about specific commands or general information about all available commands.",
+				})
+				addedHelp = true
+			}
 			commandAttributes := CommandAttribute{}
 			// for a given command, first check that it's appropriate for our callback.payload.os
 			err = mapstructure.Decode(cmd.Command.Attributes.StructValue(), &commandAttributes)
@@ -698,21 +739,39 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 				logging.LogError(err, "Failed to parse out command attributes")
 			} else if len(commandAttributes.SupportedOS) == 0 || utils.SliceContains(commandAttributes.SupportedOS, callback.Payload.Os) {
 				if cmd.Command.Payloadtype.Name != callback.Payload.Payloadtype.Name {
-					responseUserOutput += fmt.Sprintf("\n%s (%s)\n\tUsage: %s\n\tDescription: %s",
-						cmd.Command.Cmd, cmd.Command.Payloadtype.Name, cmd.Command.HelpCmd, cmd.Command.Description)
+					outputFields = append(outputFields, []string{
+						fmt.Sprintf("%s (%s)", cmd.Command.Cmd, cmd.Command.Payloadtype.Name),
+						cmd.Command.HelpCmd, cmd.Command.Description,
+					})
 				} else {
-					responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s",
-						cmd.Command.Cmd, cmd.Command.HelpCmd, cmd.Command.Description)
+					outputFields = append(outputFields, []string{
+						cmd.Command.Cmd, cmd.Command.HelpCmd, cmd.Command.Description,
+					})
 				}
 
 			}
 		}
-		responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s",
-			"help", "help [command]", "The 'help' command gives detailed information about specific commands or general information about all available commands.")
-		responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s",
-			"clear", "clear { | all | task Num}", "The 'clear' command will mark tasks as 'cleared' so that they can't be picked up by agents")
+		if !addedHelp {
+			outputFields = append(outputFields, []string{
+				"help", "help [command]", "The 'help' command gives detailed information about specific commands or general information about all available commands.",
+			})
+		}
+		if !addedClear {
+			outputFields = append(outputFields, []string{
+				"clear", "clear { | all | task Num}", "The 'clear' command will mark tasks as 'cleared' so that they can't be picked up by agents",
+			})
+		}
+		var formattedBuilder strings.Builder
+		w := tabwriter.NewWriter(&formattedBuilder, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "Command\tDescription")
+		fmt.Fprintln(w, "=======\t============")
+		for _, row := range outputFields {
+			fmt.Fprintln(w, row[0]+"\tUsage: "+row[1])
+			fmt.Fprintln(w, "\tDescription:"+strings.ReplaceAll(row[2], "\n", ""))
+		}
+		w.Flush()
 		go updateTaskStatus(task.ID, "completed", true)
-		go addOutputToTask(task.ID, responseUserOutput, task.OperationID)
+		go addOutputToTask(task.ID, formattedBuilder.String(), task.OperationID)
 		output.Error = ""
 		output.Status = "success"
 		return output
@@ -740,18 +799,20 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 	commandParameters := []databaseStructs.Commandparameters{}
 	responseUserOutput := ""
 	for _, cmd := range loadedCommands {
-		if cmd.Command.Cmd != task.Params {
+		matched, err := regexp.MatchString(task.Params, cmd.Command.Cmd)
+		if err != nil {
+			logging.LogError(err, "failed to check for matching command name", "params", task.Params)
+			continue
+		}
+		if !matched {
 			continue
 		}
 		command = cmd.Command
 		err = database.DB.Select(&commandParameters, `SELECT
-		commandparameters.*,
-		command.attributes "command.attributes",
-		command.description "command.description",
-		command.help_cmd "command.help_cmd"
+		commandparameters.*
 		FROM commandparameters
 		JOIN command ON command_id=command.id
-		WHERE command.payload_type_id=$1 AND command.cmd=$2`, callback.Payload.PayloadTypeID, task.Params)
+		WHERE command.id=$1`, command.ID)
 		if err != nil {
 			logging.LogError(err, "Failed to fetch loaded commands")
 			go updateTaskStatus(task.ID, "error", true)
@@ -770,12 +831,12 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 		if cmd.Command.Payloadtype.Name != callback.Payload.Payloadtype.Name {
 			commandName += " (" + cmd.Command.Payloadtype.Name + ")"
 		}
-		if attributesJSON, err := json.MarshalIndent(commandAttributes, "", "\t"); err != nil {
-			responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s\nAttributes: %v\nParameters:\n\n",
+		if attributesJSON, err := json.MarshalIndent(commandAttributes, "\t", "\t"); err != nil {
+			responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s\n\tAttributes: %v\n",
 				commandName, command.HelpCmd, command.Description, err.Error())
 			logging.LogError(err, "Failed to marshal command attributes")
 		} else {
-			responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s\nAttributes: %s\nParameters:\n\n",
+			responseUserOutput += fmt.Sprintf("\n%s\n\tUsage: %s\n\tDescription: %s\n\tAttributes: %s\n",
 				commandName, command.HelpCmd, command.Description, attributesJSON)
 		}
 		paramGroupNames := []string{}
@@ -785,12 +846,12 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 			}
 		}
 		for _, groupName := range paramGroupNames {
-			responseUserOutput += fmt.Sprintf("Parameter Group: %s\n", groupName)
+			responseUserOutput += fmt.Sprintf("\tParameter Group: %s\n", groupName)
 			for _, param := range commandParameters {
 				if param.ParameterGroupName == groupName {
-					responseUserOutput += fmt.Sprintf("\tParameter Name: %s\n\t\tCLI Name: %s\n\t\tDisplay Name: %s\n\t\tDescription: %s\n\t\tParameter Type: %s\n",
+					responseUserOutput += fmt.Sprintf("\t\tParameter Name: %s\n\t\t\tCLI Name: %s\n\t\t\tDisplay Name: %s\n\t\t\tDescription: %s\n\t\t\tParameter Type: %s\n",
 						param.Name, param.CliName, param.DisplayName, param.Description, param.Type)
-					responseUserOutput += fmt.Sprintf("\t\tRequired: %v\n", param.Required)
+					responseUserOutput += fmt.Sprintf("\t\t\tRequired: %v\n", param.Required)
 				}
 			}
 		}
@@ -804,24 +865,21 @@ func handleHelpCommand(createTaskInput CreateTaskInput, callback databaseStructs
 
 }
 
-func submitTaskToContainer(taskID int) CreateTaskResponse {
-	output := CreateTaskResponse{
-		Status: "error",
-		Error:  "not implemented",
-	}
+func submitTaskToContainerOpsecPre(taskID int) {
 	taskMessage := GetTaskConfigurationForContainer(taskID)
-	if err := RabbitMQConnection.SendPtTaskOPSECPre(taskMessage); err != nil {
+	err := RabbitMQConnection.SendPtTaskOPSECPre(taskMessage)
+	if err != nil {
 		logging.LogError(err, "Failed to send task to payload type")
-		output.Error = err.Error()
 		if _, err := database.DB.Exec(`UPDATE task SET status=$1 WHERE id=$2`,
 			TASK_STATUS_CONTAINER_DOWN, taskID); err != nil {
 			logging.LogError(err, "Failed to update task status")
 		}
-	} else {
-		output.Status = "success"
-		output.Error = ""
-		output.TaskID = taskID
-		output.TaskDisplayID = taskMessage.Task.DisplayID
 	}
-	return output
+	return
+}
+func submitTaskToContainerCreateTasking(taskID int) {
+	allTaskData := GetTaskConfigurationForContainer(taskID)
+	if err := RabbitMQConnection.SendPtTaskCreate(allTaskData); err != nil {
+		logging.LogError(err, "In submitTaskToContainerCreateTasking, but failed to sendSendPtTaskCreate ")
+	}
 }

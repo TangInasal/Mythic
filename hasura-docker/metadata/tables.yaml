@@ -17,6 +17,9 @@
     - name: operator
       using:
         foreign_key_constraint_on: operator_id
+    - name: payload
+      using:
+        foreign_key_constraint_on: payload_id
     - name: task
       using:
         foreign_key_constraint_on: task_id
@@ -1622,6 +1625,13 @@
           table:
             name: mythictree
             schema: public
+    - name: tags
+      using:
+        foreign_key_constraint_on:
+          column: callback_id
+          table:
+            name: tag
+            schema: public
     - name: tasks
       using:
         foreign_key_constraint_on:
@@ -1676,6 +1686,7 @@
           - architecture
           - color
           - crypto_type
+          - cwd
           - description
           - domain
           - external_ip
@@ -1687,6 +1698,7 @@
           - process_short_name
           - sleep_info
           - user
+          - impersonation_context
           - init_callback
           - last_checkin
           - timestamp
@@ -1722,6 +1734,7 @@
           - architecture
           - color
           - crypto_type
+          - cwd
           - description
           - domain
           - external_ip
@@ -1733,6 +1746,7 @@
           - process_short_name
           - sleep_info
           - user
+          - impersonation_context
           - init_callback
           - last_checkin
           - timestamp
@@ -1768,6 +1782,7 @@
           - architecture
           - color
           - crypto_type
+          - cwd
           - description
           - domain
           - external_ip
@@ -1779,6 +1794,7 @@
           - process_short_name
           - sleep_info
           - user
+          - impersonation_context
           - init_callback
           - last_checkin
           - timestamp
@@ -1814,6 +1830,7 @@
           - architecture
           - color
           - crypto_type
+          - cwd
           - description
           - domain
           - external_ip
@@ -1825,6 +1842,7 @@
           - process_short_name
           - sleep_info
           - user
+          - impersonation_context
           - init_callback
           - last_checkin
           - timestamp
@@ -1860,6 +1878,7 @@
           - architecture
           - color
           - crypto_type
+          - cwd
           - description
           - domain
           - external_ip
@@ -1871,6 +1890,7 @@
           - process_short_name
           - sleep_info
           - user
+          - impersonation_context
           - init_callback
           - last_checkin
           - timestamp
@@ -1889,6 +1909,7 @@
         columns:
           - architecture
           - color
+          - cwd
           - description
           - domain
           - external_ip
@@ -1904,6 +1925,7 @@
           - sleep_info
           - trigger_on_checkin_after_time
           - user
+          - impersonation_context
         filter:
           operation_id:
             _in: X-Hasura-operations
@@ -1915,6 +1937,7 @@
         columns:
           - architecture
           - color
+          - cwd
           - description
           - domain
           - external_ip
@@ -1930,6 +1953,7 @@
           - sleep_info
           - trigger_on_checkin_after_time
           - user
+          - impersonation_context
         filter:
           operation_id:
             _in: X-Hasura-operations
@@ -1941,11 +1965,13 @@
         columns:
           - architecture
           - color
+          - cwd
           - description
           - domain
           - external_ip
           - extra_info
           - host
+          - impersonation_context
           - integrity_level
           - ip
           - mythictree_groups
@@ -1967,11 +1993,13 @@
         columns:
           - architecture
           - color
+          - cwd
           - description
           - domain
           - external_ip
           - extra_info
           - host
+          - impersonation_context
           - integrity_level
           - ip
           - mythictree_groups
@@ -2301,7 +2329,7 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         columns:
@@ -2316,7 +2344,7 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         columns:
@@ -2331,7 +2359,7 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         columns:
@@ -2346,7 +2374,7 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: spectator
       permission:
         columns:
@@ -2361,7 +2389,7 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
   update_permissions:
     - role: developer
       permission:
@@ -2370,11 +2398,11 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
         check:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         columns:
@@ -2382,11 +2410,11 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
         check:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         columns:
@@ -2394,11 +2422,11 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
         check:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         columns:
@@ -2406,11 +2434,11 @@
         filter:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
         check:
           callback:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
 - table:
     name: command
     schema: public
@@ -2844,7 +2872,7 @@
           - credential_text
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         allow_aggregations: true
     - role: mythic_admin
       permission:
@@ -2866,7 +2894,7 @@
           - credential_text
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         allow_aggregations: true
     - role: operation_admin
       permission:
@@ -2888,7 +2916,7 @@
           - credential_text
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         allow_aggregations: true
     - role: operator
       permission:
@@ -2910,7 +2938,7 @@
           - credential_text
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         allow_aggregations: true
     - role: spectator
       permission:
@@ -2932,7 +2960,7 @@
           - credential_text
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         allow_aggregations: true
   update_permissions:
     - role: developer
@@ -2948,10 +2976,10 @@
           - type
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operator_id: x-hasura-user-id
     - role: mythic_admin
@@ -2967,10 +2995,10 @@
           - type
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operator_id: x-hasura-user-id
     - role: operation_admin
@@ -2986,10 +3014,10 @@
           - type
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operator_id: x-hasura-user-id
     - role: operator
@@ -3005,10 +3033,10 @@
           - type
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operator_id: x-hasura-user-id
 - table:
@@ -5767,6 +5795,13 @@
       using:
         foreign_key_constraint_on: task_id
   array_relationships:
+    - name: apitokens
+      using:
+        foreign_key_constraint_on:
+          column: payload_id
+          table:
+            name: apitokens
+            schema: public
     - name: buildparameterinstances
       using:
         foreign_key_constraint_on:
@@ -5830,12 +5865,20 @@
           table:
             name: staginginfo
             schema: public
+    - name: tags
+      using:
+        foreign_key_constraint_on:
+          column: payload_id
+          table:
+            name: tag
+            schema: public
   select_permissions:
     - role: developer
       permission:
         columns:
           - auto_generated
           - callback_alert
+          - callback_allowed
           - deleted
           - apitokens_id
           - eventstepinstance_id
@@ -5865,6 +5908,7 @@
         columns:
           - auto_generated
           - callback_alert
+          - callback_allowed
           - deleted
           - apitokens_id
           - eventstepinstance_id
@@ -5894,6 +5938,7 @@
         columns:
           - auto_generated
           - callback_alert
+          - callback_allowed
           - deleted
           - apitokens_id
           - eventstepinstance_id
@@ -5923,6 +5968,7 @@
         columns:
           - auto_generated
           - callback_alert
+          - callback_allowed
           - deleted
           - apitokens_id
           - eventstepinstance_id
@@ -5952,6 +5998,7 @@
         columns:
           - auto_generated
           - callback_alert
+          - callback_allowed
           - deleted
           - apitokens_id
           - eventstepinstance_id
@@ -5976,55 +6023,6 @@
           operation_id:
             _eq: X-Hasura-current-operation-id
         allow_aggregations: true
-  update_permissions:
-    - role: developer
-      permission:
-        columns:
-          - callback_alert
-          - deleted
-          - description
-        filter:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-        check:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-    - role: mythic_admin
-      permission:
-        columns:
-          - callback_alert
-          - deleted
-          - description
-        filter:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-        check:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-    - role: operation_admin
-      permission:
-        columns:
-          - callback_alert
-          - deleted
-          - description
-        filter:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-        check:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-    - role: operator
-      permission:
-        columns:
-          - callback_alert
-          - deleted
-          - description
-        filter:
-          operation_id:
-            _eq: x-hasura-current-operation-id
-        check:
-          operation_id:
-            _eq: x-hasura-current-operation-id
 - table:
     name: payload_build_step
     schema: public
@@ -6057,7 +6055,7 @@
                 _is_null: false
             - payload:
                 operation_id:
-                  _in: X-Hasura-operations
+                  _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         columns:
@@ -6079,7 +6077,7 @@
                 _is_null: false
             - payload:
                 operation_id:
-                  _in: X-Hasura-operations
+                  _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         columns:
@@ -6101,7 +6099,7 @@
                 _is_null: false
             - payload:
                 operation_id:
-                  _in: X-Hasura-operations
+                  _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         columns:
@@ -6123,7 +6121,7 @@
                 _is_null: false
             - payload:
                 operation_id:
-                  _in: X-Hasura-operations
+                  _eq: X-Hasura-current-operation-id
     - role: spectator
       permission:
         columns:
@@ -6145,7 +6143,7 @@
                 _is_null: false
             - payload:
                 operation_id:
-                  _in: X-Hasura-operations
+                  _eq: X-Hasura-current-operation-id
 - table:
     name: payloadc2profiles
     schema: public
@@ -6166,7 +6164,7 @@
         filter:
           payload:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         columns:
@@ -6176,7 +6174,7 @@
         filter:
           payload:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         columns:
@@ -6186,7 +6184,7 @@
         filter:
           payload:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         columns:
@@ -6196,7 +6194,7 @@
         filter:
           payload:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
     - role: spectator
       permission:
         columns:
@@ -6206,7 +6204,7 @@
         filter:
           payload:
             operation_id:
-              _in: X-Hasura-operations
+              _eq: X-Hasura-current-operation-id
 - table:
     name: payloadcommand
     schema: public
@@ -6358,7 +6356,7 @@
       permission:
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operation_id: x-hasura-current-operation-id
         columns:
@@ -6368,7 +6366,7 @@
       permission:
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operation_id: x-hasura-current-operation-id
         columns:
@@ -6378,7 +6376,7 @@
       permission:
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operation_id: x-hasura-current-operation-id
         columns:
@@ -6388,7 +6386,7 @@
       permission:
         check:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         set:
           operation_id: x-hasura-current-operation-id
         columns:
@@ -6407,7 +6405,7 @@
           - task_id
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         columns:
@@ -6420,7 +6418,7 @@
           - task_id
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         columns:
@@ -6433,7 +6431,7 @@
           - task_id
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         columns:
@@ -6446,7 +6444,7 @@
           - task_id
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: spectator
       permission:
         columns:
@@ -6459,7 +6457,7 @@
           - task_id
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
   update_permissions:
     - role: developer
       permission:
@@ -6467,7 +6465,7 @@
           - deleted
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check: null
     - role: mythic_admin
       permission:
@@ -6475,7 +6473,7 @@
           - deleted
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check: null
     - role: operation_admin
       permission:
@@ -6483,7 +6481,7 @@
           - deleted
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check: null
     - role: operator
       permission:
@@ -6491,29 +6489,29 @@
           - deleted
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
         check: null
   delete_permissions:
     - role: developer
       permission:
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: mythic_admin
       permission:
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: operation_admin
       permission:
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
     - role: operator
       permission:
         filter:
           operation_id:
-            _in: X-Hasura-operations
+            _eq: X-Hasura-current-operation-id
 - table:
     name: payloadtype
     schema: public
@@ -6586,6 +6584,8 @@
           - deleted
           - mythic_encrypts
           - supports_dynamic_loading
+          - supports_multiple_c2_in_build
+          - supports_multiple_c2_instances_in_build
           - use_display_params_for_cli_history
           - wrapper
           - id
@@ -6609,6 +6609,8 @@
           - deleted
           - mythic_encrypts
           - supports_dynamic_loading
+          - supports_multiple_c2_in_build
+          - supports_multiple_c2_instances_in_build
           - use_display_params_for_cli_history
           - wrapper
           - id
@@ -6632,6 +6634,8 @@
           - deleted
           - mythic_encrypts
           - supports_dynamic_loading
+          - supports_multiple_c2_in_build
+          - supports_multiple_c2_instances_in_build
           - use_display_params_for_cli_history
           - wrapper
           - id
@@ -6655,6 +6659,8 @@
           - deleted
           - mythic_encrypts
           - supports_dynamic_loading
+          - supports_multiple_c2_in_build
+          - supports_multiple_c2_instances_in_build
           - use_display_params_for_cli_history
           - wrapper
           - id
@@ -6678,6 +6684,8 @@
           - deleted
           - mythic_encrypts
           - supports_dynamic_loading
+          - supports_multiple_c2_in_build
+          - supports_multiple_c2_instances_in_build
           - use_display_params_for_cli_history
           - wrapper
           - id
@@ -7064,6 +7072,9 @@
     - name: apitoken
       using:
         foreign_key_constraint_on: apitokens_id
+    - name: callback
+      using:
+        foreign_key_constraint_on: callback_id
     - name: credential
       using:
         foreign_key_constraint_on: credential_id
@@ -7082,6 +7093,9 @@
     - name: operation
       using:
         foreign_key_constraint_on: operation_id
+    - name: payload
+      using:
+        foreign_key_constraint_on: payload_id
     - name: response
       using:
         foreign_key_constraint_on: response_id
@@ -7104,12 +7118,14 @@
           operation_id: x-hasura-current-operation-id
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7125,12 +7141,14 @@
           operation_id: x-hasura-current-operation-id
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7146,12 +7164,14 @@
           operation_id: x-hasura-current-operation-id
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7167,12 +7187,14 @@
           operation_id: x-hasura-current-operation-id
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7188,12 +7210,14 @@
           operation_id: x-hasura-current-operation-id
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7205,6 +7229,7 @@
       permission:
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - eventstepinstance_id
           - filemeta_id
@@ -7212,6 +7237,7 @@
           - keylog_id
           - mythictree_id
           - operation_id
+          - payload_id
           - response_id
           - tagtype_id
           - task_id
@@ -7227,6 +7253,7 @@
       permission:
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - eventstepinstance_id
           - filemeta_id
@@ -7234,6 +7261,7 @@
           - keylog_id
           - mythictree_id
           - operation_id
+          - payload_id
           - response_id
           - tagtype_id
           - task_id
@@ -7249,6 +7277,7 @@
       permission:
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - eventstepinstance_id
           - filemeta_id
@@ -7256,6 +7285,7 @@
           - keylog_id
           - mythictree_id
           - operation_id
+          - payload_id
           - response_id
           - tagtype_id
           - task_id
@@ -7271,6 +7301,7 @@
       permission:
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - eventstepinstance_id
           - filemeta_id
@@ -7278,6 +7309,7 @@
           - keylog_id
           - mythictree_id
           - operation_id
+          - payload_id
           - response_id
           - tagtype_id
           - task_id
@@ -7293,6 +7325,7 @@
       permission:
         columns:
           - apitokens_id
+          - callback_id
           - credential_id
           - eventstepinstance_id
           - filemeta_id
@@ -7300,6 +7333,7 @@
           - keylog_id
           - mythictree_id
           - operation_id
+          - payload_id
           - response_id
           - tagtype_id
           - task_id
@@ -7315,12 +7349,14 @@
     - role: developer
       permission:
         columns:
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7334,12 +7370,14 @@
     - role: mythic_admin
       permission:
         columns:
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7353,12 +7391,14 @@
     - role: operation_admin
       permission:
         columns:
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7372,12 +7412,14 @@
     - role: operator
       permission:
         columns:
+          - callback_id
           - credential_id
           - data
           - eventstepinstance_id
           - filemeta_id
           - keylog_id
           - mythictree_id
+          - payload_id
           - response_id
           - source
           - tagtype_id
@@ -7774,6 +7816,7 @@
           - opsec_post_bypassed
           - opsec_pre_blocked
           - opsec_pre_bypassed
+          - process_at_original_command
           - subtask_callback_function_completed
           - apitokens_id
           - callback_id
@@ -7792,6 +7835,7 @@
           - token_id
           - agent_task_id
           - command_name
+          - command_payload_type
           - comment
           - completed_callback_function
           - display_params
@@ -7830,6 +7874,7 @@
           - opsec_post_bypassed
           - opsec_pre_blocked
           - opsec_pre_bypassed
+          - process_at_original_command
           - subtask_callback_function_completed
           - apitokens_id
           - callback_id
@@ -7848,6 +7893,7 @@
           - token_id
           - agent_task_id
           - command_name
+          - command_payload_type
           - comment
           - completed_callback_function
           - display_params
@@ -7886,6 +7932,7 @@
           - opsec_post_bypassed
           - opsec_pre_blocked
           - opsec_pre_bypassed
+          - process_at_original_command
           - subtask_callback_function_completed
           - apitokens_id
           - callback_id
@@ -7904,6 +7951,7 @@
           - token_id
           - agent_task_id
           - command_name
+          - command_payload_type
           - comment
           - completed_callback_function
           - display_params
@@ -7942,6 +7990,7 @@
           - opsec_post_bypassed
           - opsec_pre_blocked
           - opsec_pre_bypassed
+          - process_at_original_command
           - subtask_callback_function_completed
           - apitokens_id
           - callback_id
@@ -7960,6 +8009,7 @@
           - token_id
           - agent_task_id
           - command_name
+          - command_payload_type
           - comment
           - completed_callback_function
           - display_params
@@ -7998,6 +8048,7 @@
           - opsec_post_bypassed
           - opsec_pre_blocked
           - opsec_pre_bypassed
+          - process_at_original_command
           - subtask_callback_function_completed
           - apitokens_id
           - callback_id
@@ -8016,6 +8067,7 @@
           - token_id
           - agent_task_id
           - command_name
+          - command_payload_type
           - comment
           - completed_callback_function
           - display_params

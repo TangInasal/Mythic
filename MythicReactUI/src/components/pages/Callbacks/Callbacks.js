@@ -1,9 +1,5 @@
 import React, { useEffect } from 'react';
-import { styled } from '@mui/material/styles';
 import { CallbacksTabs } from './CallbacksTabs';
-import SpeedDial from '@mui/material/SpeedDial';
-import SpeedDialIcon from '@mui/material/SpeedDialIcon';
-import SpeedDialAction from '@mui/material/SpeedDialAction';
 import TocIcon from '@mui/icons-material/Toc';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { CallbacksTop } from './CallbacksTop';
@@ -12,46 +8,10 @@ import PhoneForwardedIcon from '@mui/icons-material/PhoneForwarded';
 import {MythicDialog} from "../../MythicComponents/MythicDialog";
 import {ImportCallbackConfigDialog} from "./ImportCallbackConfigDialog";
 import {reorder} from "../../MythicComponents/MythicDraggableList";
+import Paper from '@mui/material/Paper';
+import IconButton from '@mui/material/IconButton';
+import {MythicStyledTooltip} from "../../MythicComponents/MythicStyledTooltip";
 
-const PREFIX = 'Callbacks';
-
-const classes = {
-    root: `${PREFIX}-root`,
-    speedDial: `${PREFIX}-speedDial`,
-    speedDialAction: `${PREFIX}-speedDialAction`,
-    tooltip: `${PREFIX}-tooltip`,
-    arrow: `${PREFIX}-arrow`
-};
-
-const StyledSpeedDial = styled(SpeedDial)(({theme}) => ({
-    [`&.${classes.speedDial}`]: {
-        position: 'absolute',
-        '&.MuiSpeedDial-directionUp, &.MuiSpeedDial-directionLeft': {
-            bottom: theme.spacing(2),
-            right: theme.spacing(2),
-        },
-        '&.MuiSpeedDial-directionDown, &.MuiSpeedDial-directionRight': {
-            top: theme.spacing(2),
-            right: theme.spacing(2),
-        },
-        zIndex: 4,
-    },
-
-    [`& .${classes.speedDialAction}`]: {
-        backgroundColor: theme.palette.speedDialAction,
-    },
-
-    [`& .${classes.tooltip}`]: {
-        backgroundColor: theme.palette.background.contrast,
-        color: theme.palette.text.contrast,
-        boxShadow: theme.shadows[1],
-        fontSize: 13,
-    },
-
-    [`& .${classes.arrow}`]: {
-        color: theme.palette.background.contrast,
-    }
-}));
 export const getCallbackIdFromClickedTab = (tabId) => {
     if(tabId === null || tabId === undefined){return 0}
     if(tabId === ""){return 0}
@@ -68,6 +28,7 @@ export const getCallbackIdFromClickedTab = (tabId) => {
 }
 
 export function Callbacks({me}) {
+    const [openCallbackImport, setOpenCallbackImport] = React.useState(false);
     const [topDisplay, setTopDisplay] = React.useState('table');
     const [openTabs, setOpenTabs] = React.useState([]);
     const [clickedTabId, setClickedTabIdValue] = React.useState('');
@@ -243,13 +204,40 @@ export function Callbacks({me}) {
     };
     return (
         <>
-            <SpeedDialWrapper setTopDisplay={setTopDisplay} />
             <Split direction="vertical"
                    sizes={callbackTableSplitSizes}
                    minSize={[0,0]}
                    onDragEnd={(sizes) => localStorage.setItem('callbackTableSplitSizes', JSON.stringify(sizes))}
                    style={{ height: "100%" }}>
-                <div className="bg-gray-base">
+                <div style={{display: "flex", flexDirection: "row-reverse"}}>
+                    <Paper elevation={5} style={{width: "30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden",
+                    backgroundColor: "transparent"}}>
+                        {topDisplay !== 'table' &&
+                            <MythicStyledTooltip title={"Table View"}>
+                                <IconButton onClick={() =>setTopDisplay("table")}>
+                                    <TocIcon />
+                                </IconButton>
+                            </MythicStyledTooltip>
+                        }
+                        {topDisplay !== 'graph' &&
+                            <MythicStyledTooltip title={"Graph View"} >
+                                <IconButton onClick={() =>setTopDisplay("graph")}>
+                                    <AssessmentIcon />
+                                </IconButton>
+                            </MythicStyledTooltip>
+                        }
+                        {openCallbackImport &&
+                            <MythicDialog fullWidth={true} maxWidth="sm" open={openCallbackImport}
+                                          onClose={()=>{setOpenCallbackImport(false);}}
+                                          innerDialog={<ImportCallbackConfigDialog onClose={()=>{setOpenCallbackImport(false);}} />}
+                            />
+                        }
+                        <MythicStyledTooltip title={"Import previously exported Callbacks"} >
+                            <IconButton onClick={() =>setOpenCallbackImport(true)}>
+                                <PhoneForwardedIcon />
+                            </IconButton>
+                        </MythicStyledTooltip>
+                    </Paper>
                     <CallbacksTop
                         callbackTableGridRef={callbackTableGridRef}
                         topDisplay={topDisplay}
@@ -257,7 +245,7 @@ export function Callbacks({me}) {
                         onOpenTabs={onOpenTabs.current}
                         me={me} clickedTabId={clickedTabId}/>
                 </div>
-                <div className="bg-gray-mid">
+                <div >
                     <CallbacksTabs
                         onCloseTab={onCloseTab}
                         onEditTabDescription={onEditTabDescription}
@@ -276,30 +264,6 @@ export function Callbacks({me}) {
     );
 }
 /*
-<div style={{ maxWidth: '100%', height: '100%', flexDirection: 'column'}}>
-
-            <React.Fragment>
-                <SpeedDialWrapper setTopDisplay={setTopDisplay} heights={heights} onSubmitHeights={onSubmitHeights} />
-                <div style={{flexGrow: 1, flexBasis: heights.top, height: heights.top }}>
-                    <CallbacksTop topDisplay={topDisplay} onOpenTab={onOpenTab.current} heights={heights} me={me}/>
-                </div>
-                <div style={{ flexGrow: 1, flexBasis: heights.bottom, height: heights.bottom }}>
-                    <CallbacksTabs
-                        onCloseTab={onCloseTab}
-                        onEditTabDescription={onEditTabDescription}
-                        tabHeight={heights.bottom}
-                        maxHeight={heights.bottom}
-                        key={'callbackstabs'}
-                        clickedTabId={clickedTabId}
-                        openTabs={openTabs}
-                        onDragTab={onDragTab}
-                        me={me}
-                        contextMenuOptions={contextMenuOptions}
-                    />
-                </div>
-            </React.Fragment>
-        </div>
- */
 function SpeedDialWrapperPreMemo({ setTopDisplay }) {
     const [open, setOpen] = React.useState(false);
     const [openCallbackImport, setOpenCallbackImport] = React.useState(false);
@@ -375,3 +339,5 @@ function SpeedDialWrapperPreMemo({ setTopDisplay }) {
     );
 }
 const SpeedDialWrapper = React.memo(SpeedDialWrapperPreMemo);
+
+ */

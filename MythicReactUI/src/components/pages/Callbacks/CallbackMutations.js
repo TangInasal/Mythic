@@ -95,6 +95,8 @@ export const taskingDataFragment = gql`
     fragment taskData on task {
         comment
         parent_task_id
+        agent_task_id
+        tasking_location
         callback {
             display_id
             id
@@ -131,6 +133,8 @@ export const taskingDataFragment = gql`
         status
         timestamp
         status_timestamp_submitted
+        status_timestamp_processing
+        status_timestamp_preprocessing
         command {
           cmd
           supported_ui_features
@@ -150,6 +154,7 @@ export const taskingDataFragment = gql`
         tasks(where: {is_interactive_task: {_eq: false}}, order_by: {id: asc}) {
             id
             comment
+            agent_task_id
             commentOperator{
                 username
             }

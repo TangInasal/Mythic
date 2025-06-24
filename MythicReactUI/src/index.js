@@ -11,11 +11,11 @@ import { RetryLink } from "@apollo/client/link/retry";
 import { getMainDefinition } from '@apollo/client/utilities'
 import { setContext } from '@apollo/client/link/context';
 import {snackActions} from './components/utilities/Snackbar';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {meState} from './cache';
 import {getSkewedNow} from "./components/utilities/Time";
 
-export const mythicUIVersion = "0.3.9";
+export const mythicUIVersion = "0.3.49";
 
 let fetchingNewToken = false;
 
@@ -61,32 +61,35 @@ export const isJWTValid = () => {
   if(!access_token){
       let cookie = document.cookie;
       if(cookie && cookie !== ""){
-          let cookiePieces = cookie.split("=")
-          if(cookiePieces.length !== 2){
-              console.log("bad number of cookie pieces", "cookie", cookie)
-          } else if(cookiePieces[0] !== "user") {
-              console.log("unknown cookie", "name", cookiePieces[0]);
-          } else {
-              try{
-                  let cookieString = decodeURIComponent(cookiePieces[1]);
-                  let cookieJSON = JSON.parse(atob(cookieString));
-                  if("access_token" in cookieJSON){
-                      successfulLogin(cookieJSON);
-                      restartWebsockets();
-                      access_token = localStorage.getItem("access_token");
-                  }else{
-                      snackActions.warning("Invalid Authentication");
-                      console.log("Error", cookieJSON);
+          let cookies = cookie.split(";");
+          for(let i = 0; i < cookies.length; i++){
+              let cookiePieces = cookies[i].split("=");
+              if(cookiePieces.length !== 2){
+                  console.log("bad number of cookie pieces", "cookie", cookies[i])
+              } else if(cookiePieces[0] !== "user") {
+                  console.log("unknown cookie", "name", cookiePieces[0]);
+              } else {
+                  try{
+                      let cookieString = decodeURIComponent(cookiePieces[1]);
+                      let cookieJSON = JSON.parse(atob(cookieString));
+                      if("access_token" in cookieJSON){
+                          successfulLogin(cookieJSON);
+                          restartWebsockets();
+                          access_token = localStorage.getItem("access_token");
+                      }else{
+                          snackActions.warning("Invalid Authentication");
+                          console.log("Error", cookieJSON);
+                      }
+                  }catch(error){
+                      console.log("error processing cookie value", error)
                   }
-              }catch(error){
-                  console.log("error processing cookie value", error)
               }
           }
       }
   }
   //console.log("in isJWTValid", "access_token", access_token);
   if(access_token){
-    const decoded_token = jwt_decode(access_token);
+    const decoded_token = jwtDecode(access_token);
     if(getSkewedNow().getTime() > decoded_token.exp * 1000){
       console.log("exp is expired: ", decoded_token.exp * 1000, getSkewedNow().getTime())
       return false;
@@ -101,7 +104,7 @@ export const JWTTimeLeft = () => {
   let access_token = localStorage.getItem("access_token");
   //console.log("in isJWTValid", "access_token", access_token);
   if(access_token){
-    const decoded_token = jwt_decode(access_token);
+    const decoded_token = jwtDecode(access_token);
     return (decoded_token.exp * 1000) - getSkewedNow();
   }else{
     return 0;
@@ -116,7 +119,7 @@ const authLink = setContext( async (_, {headers}) => {
   }
     let access_token = localStorage.getItem('access_token');
     if(access_token){
-      const decoded_token = jwt_decode(access_token);
+      const decoded_token = jwtDecode(access_token);
       //console.log(decoded_token);
       // JWT lifetime is 4 hours. If there's 2hrs or less left of the JWT, update it
       let diff = (decoded_token.exp * 1000) - getSkewedNow();
@@ -174,6 +177,8 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
               snackActions.error(err.message);
               break;
           case 'access-denied':
+              snackActions.error(err.message);
+              break;
             //fallsthrough
           case 'start-failed':
             // when AuthenticationError thrown in resolver
@@ -345,12 +350,11 @@ if(localStorage.getItem("access_token") !== null){
               refresh_token: localStorage.getItem("refresh_token"),
               user: JSON.parse(localStorage.getItem("user"))
           })
+      } else {
+          FailedRefresh();
       }
   }else{
-      //leave meState as a blank value to force new login
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
+      FailedRefresh();
   }
 }
 const container = document.getElementById('root');

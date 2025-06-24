@@ -20,8 +20,10 @@ import MythicStyledTableCell from '../../MythicComponents/MythicTableCell';
 import {Typography} from '@mui/material';
 import {MythicFileContext} from "../../MythicComponents/MythicFileContext";
 import {snackActions} from "../../utilities/Snackbar";
+import {useTheme} from '@mui/material/styles';
 
 export function CreatePayloadParameter({onChange, parameter_type, default_value, name, required, verifier_regex, id, description, initialValue, choices, trackedValue, returnAllDictValues}){
+    const theme = useTheme();
     const [value, setValue] = React.useState("");
     const [valueNum, setValueNum] = React.useState(0);
     const [multiValue, setMultiValue] = React.useState([]);
@@ -49,10 +51,13 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
     }
     useEffect( () => {
         if(parameter_type === "ChooseOne" || parameter_type === "ChooseOneCustom"){
-            setValue(trackedValue);
             setChooseOptions(choices);
             if(!choices.includes(trackedValue)){
                 setChooseOneCustomValue(trackedValue);
+                setValue(default_value);
+            } else {
+                setValue(trackedValue);
+                setChooseOneCustomValue("");
             }
         }else if(parameter_type === "Number"){
             setValueNum(trackedValue);
@@ -129,15 +134,9 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
         onChange(name, evt.target.value, false);
     }
     const onChangeMultValue = (evt) => {
-        const {options} = evt.target;
-        const tmpValue = [];
-        for (let i = 0, l = options.length; i < l; i += 1) {
-          if (options[i].selected) {
-            tmpValue.push(options[i].value);
-          }
-        }
-        setMultiValue(tmpValue);
-        onChange(name, tmpValue, false);
+        const { value:options } = evt.target;
+        setMultiValue(options);
+        onChange(name, options, false);
     }
     const onChangeText = (name, value, error) => {
         setValue(value);
@@ -260,20 +259,7 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
     }
     const onChangeArrayText = (value, error, index) => {
         let values = [...arrayValue];
-        if(value.includes("\n")){
-            let new_values = value.split("\n");
-            if(values[index] === ""){
-                values = [...values.slice(0, index+1), ...new_values.slice(1), ...values.slice(index+1)];
-                values[index] = values[index] + new_values[0];
-            } else if(values[index] === new_values[0]){
-                values = [...values.slice(0, index+1), ...new_values.slice(1), ...values.slice(index+1)];
-            } else {
-                new_values[0] = new_values[0].slice(values[index].length)
-                values = [...values.slice(0, index+1), ...new_values, ...values.slice(index+1)];
-            }
-        }else{
-            values[index] = value;
-        }
+        values[index] = value;
         setArrayValue(values);
         onChange(name, values, false);
     }
@@ -331,8 +317,9 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                         </Button>
                         { fileMultValue.length > 0 &&
                             fileMultValue?.map((f, i) => (
-                                <div key={i}>
-                                    {typeof f === "string" && <MythicFileContext agent_file_id={f} />}
+                                <div key={i} style={{display: "inline-block"}}>
+                                    {typeof f === "string" && <MythicFileContext agent_file_id={f}
+                                                                                 extraStyles={{bottom: "-10px", position: "relative", marginLeft: "5px", marginRight: "5px"}} />}
                                     {typeof f !== "string" && (f.name)}
                                 </div>
                             ))
@@ -347,7 +334,8 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                             <input onChange={onFileChange} type="file" hidden />
                         </Button>
                         {fileValue.legacy &&
-                            <MythicFileContext agent_file_id={fileValue.name} />
+                            <MythicFileContext agent_file_id={fileValue.name}
+                                               extraStyles={{bottom: "-10px", position: "relative", marginLeft: "5px", marginRight: "5px"}} />
                         }
                     </>
 
@@ -387,7 +375,7 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                                 </Select>
                             </FormControl>
                             OR
-                            <MythicTextField name={name} required={required} placeholder={"Custom Value"} value={chooseOneCustomValue} multiline={true} maxRows={5}
+                            <MythicTextField name={name} requiredValue={required} placeholder={"Custom Value"} value={chooseOneCustomValue} multiline={true} maxRows={5}
                                              onChange={onChangeTextChooseOneCustom} display="inline-block"
                             />
                         </div>
@@ -400,12 +388,11 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                         <Select
                             value={multiValue}
                             multiple={true}
-                            native
                             onChange={onChangeMultValue}
                         >
                         {
                             chooseOptions.map((opt, i) => (
-                                <option key={"buildparamopt" + i} value={opt}>{opt}</option>
+                                <MenuItem key={"buildparamopt" + i} value={opt}>{opt}</MenuItem>
                             ))
                         }
                         </Select>
@@ -419,12 +406,12 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                                 {arrayValue.map( (a, i) => (
                                     <TableRow key={'array' + name + i} style={{}} >
                                         <MythicStyledTableCell style={{width: "2rem"}}>
-                                            <DeleteIcon onClick={(e) => {removeArrayValue(i)}} color="error"
-                                                        style={{cursor: "pointer"}}
-                                            />
+                                            <IconButton onClick={(e) => {removeArrayValue(i)}} color="error">
+                                                <DeleteIcon/>
+                                            </IconButton>
                                         </MythicStyledTableCell>
                                         <MythicStyledTableCell>
-                                            <MythicTextField required={required} fullWidth={true} placeholder={""} value={a} multiline={true}
+                                            <MythicTextField requiredValue={required} fullWidth={true} placeholder={""} value={a} multiline={true}
                                                 onChange={(n,v,e) => onChangeArrayText(v, e, i)} display="inline-block" autoFocus={a === ""}
                                                 validate={testParameterValues} errorText={"Must match: " + verifier_regex} marginBottom={"0px"}
                                             />
@@ -455,7 +442,6 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                                             <div style={{display: "inline-flex", alignItems: "center", width: "100%"}}>
                                                 <FormControl style={{width: "30%"}}>
                                                     <Select
-
                                                         value={a[0]}
                                                         onChange={(e) => onChangeTypedArrayChoice(e, i)}
                                                         input={<Input />}
@@ -520,7 +506,7 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
                 );
             case "Number":
                 return (
-                    <MythicTextField required={required} value={valueNum} type={"number"}
+                    <MythicTextField requiredValue={required} value={valueNum} type={"number"}
                         onChange={onChangeNumber} display="inline-block" name={name} showLabel={false}
                         validate={testParameterValues} errorText={"Must match: " + verifier_regex}
                                      marginBottom={"0px"}
@@ -573,15 +559,21 @@ export function CreatePayloadParameter({onChange, parameter_type, default_value,
     }
     
     return (
-            <TableRow key={"buildparam" + id}>
-                <TableCell>
+            <TableRow key={"buildparam" + id} hover>
+                <MythicStyledTableCell>
                     <MythicStyledTooltip title={name.length > 0 ? name : "No Description"}>
-                        {description}
+                        <Typography style={{fontWeight: "600"}} >
+                            {name}
+                        </Typography>
+                        <Typography style={{fontSize: theme.typography.pxToRem(15), marginLeft: "10px"}}>
+                            {description}
+                        </Typography>
+
                         {modifiedValue() ? (
                             <Typography color="warning.main">Modified</Typography>
                         ) : null}
                     </MythicStyledTooltip>
-                 </TableCell>
+                 </MythicStyledTableCell>
                 <MythicStyledTableCell>
                     {getParameterObject()}
                 </MythicStyledTableCell>

@@ -39,7 +39,6 @@ import {Eventing} from "./pages/Eventing/Eventing";
 import {InviteForm} from "./pages/Login/InviteForm";
 import {snackActions} from "./utilities/Snackbar";
 import {TopAppBarVertical} from "./TopAppBarVertical";
-import {TopAppBar} from "./TopAppBar";
 
 export const userSettingsQuery = gql`
 query getUserSettings {
@@ -58,85 +57,179 @@ export function App(props) {
     const [loadingPreference, setLoadingPreferences] = React.useState(true);
     const [themeMode, themeToggler] = useDarkMode();
     const theme = React.useMemo(
-        () =>
-            createTheme({
-                transitions: {
-                    // So we have `transition: none;` everywhere
-                    create: () => 'none',
-                },
-                palette: {
-                    //contrastThreshold: 4.5,
-                    primary: {
-                        main: themeMode === "dark" ? preferences?.palette?.primary?.dark || operatorSettingDefaults.palette.primary.dark :
-                            preferences?.palette?.primary?.light || operatorSettingDefaults.palette.primary.light,
+        () => {
+            try{
+                return createTheme({
+                    transitions: {
+                        // So we have `transition: none;` everywhere
+                        create: () => 'none',
                     },
-                    error: {
-                        main: themeMode === "dark" ? preferences?.palette?.error?.dark || operatorSettingDefaults.palette.error.dark :
-                            preferences?.palette?.error?.light || operatorSettingDefaults.palette.error.light,
+                    palette: {
+                        contrastThreshold: 4.5,
+                        //tonalOffset: 0.5,
+                        primary: {
+                            main: themeMode === "dark" ? preferences?.palette?.primary?.dark || operatorSettingDefaults.palette.primary.dark :
+                                preferences?.palette?.primary?.light || operatorSettingDefaults.palette.primary.light,
+                        },
+                        error: {
+                            main: themeMode === "dark" ? preferences?.palette?.error?.dark || operatorSettingDefaults.palette.error.dark :
+                                preferences?.palette?.error?.light || operatorSettingDefaults.palette.error.light,
+                        },
+                        success: {
+                            main: themeMode === 'dark' ? preferences?.palette?.success?.dark || operatorSettingDefaults.palette.success.dark :
+                                preferences?.palette?.success?.light || operatorSettingDefaults.palette.success.light,
+                        },
+                        secondary: {
+                            main: themeMode === 'dark' ? preferences?.palette?.secondary?.dark || operatorSettingDefaults.palette.secondary.dark :
+                                preferences?.palette?.secondary?.light || operatorSettingDefaults.palette.secondary.light,
+                        },
+                        info: {
+                            main: themeMode === 'dark' ? preferences?.palette?.info?.dark || operatorSettingDefaults.palette.info.dark :
+                                preferences?.palette?.info?.light || operatorSettingDefaults.palette.info.light,
+                        },
+                        warning: {
+                            main: themeMode === 'dark' ? preferences?.palette?.warning?.dark || operatorSettingDefaults.palette.warning.dark :
+                                preferences?.palette?.warning?.light || operatorSettingDefaults.palette.warning.light,
+                        },
+                        mode: themeMode,
+                        background: {
+                            contrast: themeMode === 'dark' ? preferences?.palette?.background?.light || operatorSettingDefaults.palette.background.light :
+                                preferences?.palette?.background?.dark || operatorSettingDefaults.palette.background.dark,
+                            default: themeMode === "dark" ? preferences?.palette?.background?.dark || operatorSettingDefaults.palette.background.dark :
+                                preferences?.palette?.background?.light || operatorSettingDefaults.palette.background.light,
+                            paper: themeMode === "dark" ?  preferences?.palette?.paper?.dark || operatorSettingDefaults.palette.paper.dark :
+                                preferences?.palette?.paper?.light || operatorSettingDefaults.palette.paper.light,
+                            image: themeMode === "dark" ?  preferences?.palette?.backgroundImage?.dark || operatorSettingDefaults.palette.backgroundImage.dark :
+                                preferences?.palette?.backgroundImage?.light || operatorSettingDefaults.palette.backgroundImage.light,
+                        },
+                        text: {
+                            primary: themeMode === 'dark' ? preferences?.palette?.text?.dark || operatorSettingDefaults.palette.text.dark :
+                                preferences?.palette?.text?.light || operatorSettingDefaults.palette.text.light,
+                            contrast: themeMode === 'dark' ? '#000' : '#fff',
+                        },
+                        graphGroupRGBA: themeMode === 'dark' ? 'rgba(57, 76, 93, 0.5)' : 'rgba(211, 215, 232, 0.5)',
+                        speedDialAction: themeMode === 'dark' ? '#495054' : '#ffffff',
                     },
-                    success: {
-                        main: themeMode === 'dark' ? preferences?.palette?.success?.dark || operatorSettingDefaults.palette.success.dark :
-                            preferences?.palette?.success?.light || operatorSettingDefaults.palette.success.light,
+                    folderColor: '#f1d592',
+                    tableHeader: themeMode === 'dark' ? preferences?.palette?.tableHeader?.dark || operatorSettingDefaults.palette.tableHeader.dark :
+                        preferences?.palette?.tableHeader?.light || operatorSettingDefaults.palette.tableHeader.light,
+                    selectedCallbackColor: themeMode === 'dark' ? preferences?.palette?.selectedCallbackColor?.dark || operatorSettingDefaults.palette.selectedCallbackColor.dark :
+                        preferences?.palette?.selectedCallbackColor?.light || operatorSettingDefaults.palette.selectedCallbackColor.light,
+                    selectedCallbackHierarchyColor:  themeMode === 'dark' ? preferences?.palette?.selectedCallbackHierarchyColor?.dark || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.dark :
+                        preferences?.palette?.selectedCallbackHierarchyColor?.light || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.light,
+                    tableHover: themeMode === 'dark' ? preferences?.palette?.tableHover?.dark || operatorSettingDefaults.palette.tableHover.dark :
+                        preferences?.palette?.tableHover?.light || operatorSettingDefaults.palette.tableHover.light,
+                    navBarTextIconColor: themeMode === 'dark' ? preferences?.palette?.navBarIcons?.dark || operatorSettingDefaults.palette.navBarIcons.dark :
+                        preferences?.palette?.navBarIcons?.light || operatorSettingDefaults.palette.navBarIcons.light,
+                    navBarTextColor: themeMode === 'dark' ? preferences?.palette?.navBarText?.dark || operatorSettingDefaults.palette.navBarText.dark :
+                        preferences?.palette?.navBarText?.light || operatorSettingDefaults.palette.navBarText.light,
+                    pageHeader: {
+                        main: themeMode === 'dark' ? preferences?.palette?.pageHeader?.dark || operatorSettingDefaults.palette.pageHeader.dark :
+                            preferences?.palette?.pageHeader?.light || operatorSettingDefaults.palette.pageHeader.light,
                     },
-                    secondary: {
-                        main: themeMode === 'dark' ? preferences?.palette?.secondary?.dark || operatorSettingDefaults.palette.secondary.dark :
-                            preferences?.palette?.secondary?.light || operatorSettingDefaults.palette.secondary.light,
+                    pageHeaderText: {
+                        main: 'white',
                     },
-                    info: {
-                        main: themeMode === 'dark' ? preferences?.palette?.info?.dark || operatorSettingDefaults.palette.info.dark :
-                            preferences?.palette?.info?.light || operatorSettingDefaults.palette.info.light,
+                    topAppBarColor: themeMode === 'dark' ? preferences?.palette?.navBarColor?.dark || operatorSettingDefaults.palette.navBarColor.dark :
+                        preferences?.palette?.navBarColor?.light || operatorSettingDefaults.palette.navBarColor.light,
+                    typography: {
+                        fontSize: preferences?.fontSize,
+                        fontFamily: preferences?.fontFamily
                     },
-                    warning: {
-                        main: themeMode === 'dark' ? preferences?.palette?.warning?.dark || operatorSettingDefaults.palette.warning.dark :
-                            preferences?.palette?.warning?.light || operatorSettingDefaults.palette.warning.light,
+                    taskPromptTextColor: themeMode === 'dark' ? preferences?.palette?.taskPromptTextColor?.dark || operatorSettingDefaults.palette.taskPromptTextColor.dark :
+                        preferences?.palette?.taskPromptTextColor?.light || operatorSettingDefaults.palette.taskPromptTextColor.light,
+                    taskPromptCommandTextColor: themeMode === 'dark' ? preferences?.palette?.taskPromptCommandTextColor?.dark || operatorSettingDefaults.palette.taskPromptCommandTextColor.dark :
+                        preferences?.palette?.taskPromptCommandTextColor?.light || operatorSettingDefaults.palette.taskPromptCommandTextColor.light,
+                    taskContextCwdColor: themeMode === 'dark' ? preferences?.palette?.taskContextCwdColor?.dark || operatorSettingDefaults.palette.taskContextCwdColor.dark :
+                        preferences?.palette?.taskContextCwdColor?.light || operatorSettingDefaults.palette.taskContextCwdColor.light,
+                    taskContextImpersonationColor: themeMode === 'dark' ? preferences?.palette?.taskContextImpersonationColor?.dark || operatorSettingDefaults.palette.taskContextImpersonationColor.dark :
+                        preferences?.palette?.taskContextImpersonationColor?.light || operatorSettingDefaults.palette.taskContextImpersonationColor.light,
+                    taskContextExtraColor: themeMode === 'dark' ? preferences?.palette?.taskContextExtraColor?.dark || operatorSettingDefaults.palette.taskContextExtraColor.dark :
+                        preferences?.palette?.taskContextExtraColor?.light || operatorSettingDefaults.palette.taskContextExtraColor.light,
+                })
+            }catch(error){
+                console.log(error);
+                snackActions.error(error.message);
+                return createTheme({
+                    transitions: {
+                        // So we have `transition: none;` everywhere
+                        create: () => 'none',
                     },
-                    mode: themeMode,
-                    background: {
-                        contrast: themeMode === 'dark' ? preferences?.palette?.background?.light || operatorSettingDefaults.palette.background.light :
-                            preferences?.palette?.background?.dark || operatorSettingDefaults.palette.background.dark,
-                        default: themeMode === "dark" ? preferences?.palette?.background?.dark || operatorSettingDefaults.palette.background.dark :
-                            preferences?.palette?.background?.light || operatorSettingDefaults.palette.background.light,
-                        paper: themeMode === "dark" ?  preferences?.palette?.paper?.dark || operatorSettingDefaults.palette.paper.dark :
-                            preferences?.palette?.paper?.light || operatorSettingDefaults.palette.paper.light,
-                        image: themeMode === "dark" ?  preferences?.palette?.backgroundImage?.dark || operatorSettingDefaults.palette.backgroundImage.dark :
-                            preferences?.palette?.backgroundImage?.light || operatorSettingDefaults.palette.backgroundImage.light,
+                    palette: {
+                        contrastThreshold: 4.5,
+                        //tonalOffset: 0.5,
+                        primary: {
+                            main: themeMode === "dark" ? operatorSettingDefaults.palette.primary.dark :
+                                operatorSettingDefaults.palette.primary.light,
+                        },
+                        error: {
+                            main: themeMode === "dark" ? operatorSettingDefaults.palette.error.dark :
+                                operatorSettingDefaults.palette.error.light,
+                        },
+                        success: {
+                            main: themeMode === 'dark' ? operatorSettingDefaults.palette.success.dark :
+                                operatorSettingDefaults.palette.success.light,
+                        },
+                        secondary: {
+                            main: themeMode === 'dark' ? operatorSettingDefaults.palette.secondary.dark :
+                                operatorSettingDefaults.palette.secondary.light,
+                        },
+                        info: {
+                            main: themeMode === 'dark' ? operatorSettingDefaults.palette.info.dark :
+                                operatorSettingDefaults.palette.info.light,
+                        },
+                        warning: {
+                            main: themeMode === 'dark' ? operatorSettingDefaults.palette.warning.dark :
+                                operatorSettingDefaults.palette.warning.light,
+                        },
+                        mode: themeMode,
+                        background: {
+                            contrast: themeMode === 'dark' ?operatorSettingDefaults.palette.background.light :
+                                operatorSettingDefaults.palette.background.dark,
+                            default: themeMode === "dark" ? operatorSettingDefaults.palette.background.dark :
+                                operatorSettingDefaults.palette.background.light,
+                            paper: themeMode === "dark" ?  operatorSettingDefaults.palette.paper.dark :
+                                operatorSettingDefaults.palette.paper.light,
+                            image: themeMode === "dark" ?  operatorSettingDefaults.palette.backgroundImage.dark :
+                                operatorSettingDefaults.palette.backgroundImage.light,
+                        },
+                        text: {
+                            primary: themeMode === 'dark' ? operatorSettingDefaults.palette.text.dark :
+                                operatorSettingDefaults.palette.text.light,
+                            contrast: themeMode === 'dark' ? '#000' : '#fff',
+                        },
+                        graphGroupRGBA: themeMode === 'dark' ? 'rgba(57, 76, 93, 0.5)' : 'rgba(211, 215, 232, 0.5)',
+                        speedDialAction: themeMode === 'dark' ? '#495054' : '#ffffff',
                     },
-                    text: {
-                        primary: themeMode === 'dark' ? preferences?.palette?.text?.dark || operatorSettingDefaults.palette.text.dark :
-                            preferences?.palette?.text?.light || operatorSettingDefaults.palette.text.light,
-                        contrast: themeMode === 'dark' ? '#000' : '#fff',
+                    folderColor: '#f1d592',
+                    tableHeader: themeMode === 'dark' ? operatorSettingDefaults.palette.tableHeader.dark :
+                        operatorSettingDefaults.palette.tableHeader.light,
+                    selectedCallbackColor: themeMode === 'dark' ? operatorSettingDefaults.palette.selectedCallbackColor.dark :
+                        operatorSettingDefaults.palette.selectedCallbackColor.light,
+                    selectedCallbackHierarchyColor:  themeMode === 'dark' ? operatorSettingDefaults.palette.selectedCallbackHierarchyColor.dark :
+                        operatorSettingDefaults.palette.selectedCallbackHierarchyColor.light,
+                    tableHover: themeMode === 'dark' ? operatorSettingDefaults.palette.tableHover.dark :
+                        operatorSettingDefaults.palette.tableHover.light,
+                    navBarTextIconColor: themeMode === 'dark' ? operatorSettingDefaults.palette.navBarIcons.dark :
+                        operatorSettingDefaults.palette.navBarIcons.light,
+                    navBarTextColor: themeMode === 'dark' ? operatorSettingDefaults.palette.navBarText.dark :
+                        operatorSettingDefaults.palette.navBarText.light,
+                    pageHeader: {
+                        main: themeMode === 'dark' ? operatorSettingDefaults.palette.pageHeader.dark :
+                            operatorSettingDefaults.palette.pageHeader.light,
                     },
-                    graphGroupRGBA: themeMode === 'dark' ? 'rgba(57, 76, 93, 0.5)' : 'rgba(211, 215, 232, 0.5)',
-                    speedDialAction: themeMode === 'dark' ? '#495054' : '#ffffff',
-                },
-                folderColor: '#f1d592',
-                tableHeader: themeMode === 'dark' ? preferences?.palette?.tableHeader?.dark || operatorSettingDefaults.palette.tableHeader.dark :
-                    preferences?.palette?.tableHeader?.light || operatorSettingDefaults.palette.tableHeader.light,
-                selectedCallbackColor: themeMode === 'dark' ? preferences?.palette?.selectedCallbackColor?.dark || operatorSettingDefaults.palette.selectedCallbackColor.dark :
-                    preferences?.palette?.selectedCallbackColor?.light || operatorSettingDefaults.palette.selectedCallbackColor.light,
-                selectedCallbackHierarchyColor:  themeMode === 'dark' ? preferences?.palette?.selectedCallbackHierarchyColor?.dark || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.dark :
-                    preferences?.palette?.selectedCallbackHierarchyColor?.light || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.light,
-                tableHover: themeMode === 'dark' ? preferences?.palette?.tableHover?.dark || operatorSettingDefaults.palette.tableHover.dark :
-                    preferences?.palette?.tableHover?.light || operatorSettingDefaults.palette.tableHover.light,
-                navBarTextIconColor: themeMode === 'dark' ? preferences?.palette?.navBarIcons?.dark || operatorSettingDefaults.palette.navBarIcons.dark :
-                    preferences?.palette?.navBarIcons?.light || operatorSettingDefaults.palette.navBarIcons.light,
-                navBarTextColor: themeMode === 'dark' ? preferences?.palette?.navBarText?.dark || operatorSettingDefaults.palette.navBarText.dark :
-                    preferences?.palette?.navBarText?.light || operatorSettingDefaults.palette.navBarText.light,
-                pageHeader: {
-                    main: themeMode === 'dark' ? preferences?.palette?.pageHeader?.dark || operatorSettingDefaults.palette.pageHeader.dark :
-                        preferences?.palette?.pageHeader?.light || operatorSettingDefaults.palette.pageHeader.light,
-                },
-                pageHeaderText: {
-                    main: 'white',
-                },
-                topAppBarColor: themeMode === 'dark' ? preferences?.palette?.navBarColor?.dark || operatorSettingDefaults.palette.navBarColor.dark :
-                    preferences?.palette?.navBarColor?.light || operatorSettingDefaults.palette.navBarColor.light,
-                typography: {
-                    fontSize: preferences?.fontSize,
-                    fontFamily: preferences?.fontFamily
-                },
-            }),
-        [themeMode, loadingPreference, preferences.fontSize, preferences.fontFamily, preferences.palette]
+                    pageHeaderText: {
+                        main: 'white',
+                    },
+                    topAppBarColor: themeMode === 'dark' ? operatorSettingDefaults.palette.navBarColor.dark :
+                        operatorSettingDefaults.palette.navBarColor.light,
+                    typography: {
+                        fontSize: operatorSettingDefaults?.fontSize,
+                        fontFamily: operatorSettingDefaults?.fontFamily
+                    },
+                })
+            }
+        },[themeMode, loadingPreference, preferences.fontSize, preferences.fontFamily, preferences.palette]
     );
     const mountedRef = React.useRef(true);
     const [openRefreshDialog, setOpenRefreshDialog] = React.useState(false);
@@ -190,6 +283,13 @@ export function App(props) {
             </StyledEngineProvider>
         )
     }
+    const background = theme.palette.background.image !== null ? {
+        background: "linear-gradient(" + theme.palette.background.default + "99" + "," + theme.palette.background.default + "99" + ")," + theme.palette.background.image ,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "100% 100%"
+    } : {
+        backgroundColor: theme.palette.background.default
+    };
     return (
         <StyledEngineProvider injectFirst>
             <ThemeProvider theme={theme}>
@@ -198,12 +298,14 @@ export function App(props) {
                 <Tooltip id={"my-tooltip"} style={{zIndex: 100000, wordBreak: "break-word", maxWidth: "80%", whiteSpace: "pre-wrap"}}/>
                 <ToastContainer limit={2} autoClose={3000}
                                 theme={themeMode}
-                                style={{maxWidth: "100%", minWidth: "40%", width: "40%", marginTop: "20px", display: "flex", flexWrap: "wrap",
-                                wordBreak: "break-all", flexDirection: "column", justifyContent: "center"}}
+                                hideProgressBar={true}
+                                newestOnTop={true}
+                                stacked={false}
+                                style={{maxWidth: "100%", minWidth: "40%", width: "40%", display: "flex", flexWrap: "wrap",
+                                wordBreak: "break-all", flexDirection: "column", justifyContent: "center",}}
                                 pauseOnFocusLoss={false} />
                     <div style={{ maxHeight: '100%', height: '100%', display: 'flex', flexDirection: 'row', maxWidth: "100%", width:"100%",
-                        backgroundImage: theme.palette.background.image !== null ? theme.palette.background.image : "",
-                        backgroundSize: "contain"}}>
+                        ...background}}>
 
                         {openRefreshDialog &&
                             <MythicDialog fullWidth={true} maxWidth="sm" open={openRefreshDialog}
@@ -212,7 +314,7 @@ export function App(props) {
                                               onClose={()=>{setOpenRefreshDialog(false);}} />}
                             />
                         }
-                        {me.loggedIn && me.user !== undefined && me.user !== null && preferences?.["experiment-newSidebar"] ? (
+                        {me.loggedIn && me.user !== undefined && me.user !== null  ? (
                             <TopAppBarVertical me={me} theme={themeMode} toggleTheme={themeToggler} />
                         ) : null}
                         <div style={{
@@ -222,16 +324,7 @@ export function App(props) {
                             flexDirection: 'column',
                             width: "100%"
                         }}>
-                            {me.loggedIn && !preferences?.["experiment-newSidebar"] &&
-                                <div style={{minHeight: '50px', flexGrow: 0}}>
-                                    {me.loggedIn && me.user !== undefined && me.user !== null ? (
-                                        <TopAppBar me={me} theme={themeMode} toggleTheme={themeToggler}/>
-                                    ) : null}
-                                </div>
-                            }
-                            {me.loggedIn && (me?.user?.current_operation_banner_text !== "" ||
-                                    preferences?.["experiment-newSidebar"])
-                                &&
+                            {me.loggedIn && me?.user?.current_operation_banner_text !== "" &&
                                 <Typography style={{
                                     backgroundColor: me?.user?.current_operation_banner_color,
                                     width: "100%",

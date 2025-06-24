@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid';
 import SearchIcon from '@mui/icons-material/Search';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
-import { gql, useLazyQuery, useMutation} from '@apollo/client';
+import { gql, useMutation} from '@apollo/client';
 import { snackActions } from '../../utilities/Snackbar';
 import Pagination from '@mui/material/Pagination';
 import { Button, Typography } from '@mui/material';
@@ -17,9 +17,10 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 const credentialFragment = gql`
-fragment credentialData on credential{
+fragment credentialSearchData on credential{
     account
     comment
     credential_text
@@ -61,7 +62,7 @@ query accountQuery($operation_id: Int!, $account: String!, $offset: Int!, $fetch
       }
     }
     credential(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {account: {_ilike: $account}, operation_id: {_eq: $operation_id}, deleted: {_eq: $deleted}}) {
-      ...credentialData
+      ...credentialSearchData
     }
   }
 `;
@@ -74,7 +75,7 @@ query realmQuery($operation_id: Int!, $realm: String!, $offset: Int!, $fetchLimi
       }
     }
     credential(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {realm: {_ilike: $realm}, operation_id: {_eq: $operation_id}, deleted: {_eq: $deleted}}) {
-      ...credentialData
+      ...credentialSearchData
     }
   }
 `;
@@ -87,7 +88,7 @@ query credQuery($operation_id: Int!, $credential: String!, $offset: Int!, $fetch
       }
     }
     credential(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {credential_text: {_ilike: $credential}, operation_id: {_eq: $operation_id}, deleted: {_eq: $deleted}}) {
-      ...credentialData
+      ...credentialSearchData
     }
   }
 `;
@@ -100,21 +101,21 @@ query commentQuery($operation_id: Int!, $comment: String!, $offset: Int!, $fetch
       }
     }
     credential(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {comment: {_ilike: $comment}, operation_id: {_eq: $operation_id}, deleted: {_eq: $deleted}}) {
-      ...credentialData
+      ...credentialSearchData
     }
   }
 `;
 const tagSearch = gql`
 ${credentialFragment}
 query tagQuery($tag: String!, $offset: Int!, $fetchLimit: Int!) {
-    tag_aggregate(distinct_on: id, where: {credential_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}]}) {
+    tag_aggregate(distinct_on: credential_id, where: {credential_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}]}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {credential_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}]}) {
+    tag(limit: $fetchLimit, distinct_on: credential_id, offset: $offset, order_by: {credential_id: desc}, where: {credential_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}]}) {
         credential {
-            ...credentialData
+            ...credentialSearchData
         }
     }
   }
@@ -221,7 +222,7 @@ const SearchTabCredentialsSearchPanel = (props) => {
     }, [props.value, props.index])
     return (
         <Grid container spacing={2} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={5}>
+            <Grid size={5}>
                 <MythicTextField placeholder="Search..." value={search}
                     onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..." InputProps={{
                         endAdornment: 
@@ -233,7 +234,7 @@ const SearchTabCredentialsSearchPanel = (props) => {
                         style: {padding: 0}
                     }}/>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Select
                     style={{marginBottom: "10px", width: "100%"}}
                     value={searchField}
@@ -246,7 +247,7 @@ const SearchTabCredentialsSearchPanel = (props) => {
                     }
                 </Select>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 {createCredentialDialogOpen &&
                     <MythicDialog fullWidth={true} maxWidth="md" open={createCredentialDialogOpen} 
                         onClose={()=>{setCreateCredentialDialogOpen(false);}} 
@@ -278,6 +279,8 @@ const SearchTabCredentialsSearchPanel = (props) => {
         </Grid>
     );
 }
+
+
 export const SearchTabCredentialsPanel = (props) =>{
     const [credentialaData, setCredentialData] = React.useState([]);
     const [totalCount, setTotalCount] = React.useState(0);
@@ -327,30 +330,20 @@ export const SearchTabCredentialsPanel = (props) =>{
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getAccountSearch] = useLazyQuery(accountSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCredentialSearchResults,
-        onError: handleCallbackSearchFailure
+    const getAccountSearch = useMythicLazyQuery(accountSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getRealmSearch] = useLazyQuery(realmSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCredentialSearchResults,
-        onError: handleCallbackSearchFailure
+    const getRealmSearch = useMythicLazyQuery(realmSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getCredentialSearch] = useLazyQuery(credentialSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCredentialSearchResults,
-        onError: handleCallbackSearchFailure
+    const getCredentialSearch = useMythicLazyQuery(credentialSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getCommentSearch] = useLazyQuery(commentSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCredentialSearchResults,
-        onError: handleCallbackSearchFailure
+    const getCommentSearch = useMythicLazyQuery(commentSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getTagSearch] = useLazyQuery(tagSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCredentialSearchResults,
-        onError: handleCallbackSearchFailure
+    const getTagSearch = useMythicLazyQuery(tagSearch, {
+        fetchPolicy: "no-cache"
     })
     const onAccountSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -361,7 +354,7 @@ export const SearchTabCredentialsPanel = (props) =>{
             fetchLimit: fetchLimit,
             account: "%" + search + "%",
             deleted: showDeleted.current
-        }})
+        }}).then(({data}) => handleCredentialSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onRealmSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -372,7 +365,7 @@ export const SearchTabCredentialsPanel = (props) =>{
             fetchLimit: fetchLimit,
             realm: "%" + search + "%",
             deleted: showDeleted.current
-        }})
+        }}).then(({data}) => handleCredentialSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onCredentialSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -383,7 +376,7 @@ export const SearchTabCredentialsPanel = (props) =>{
             fetchLimit: fetchLimit,
             credential: "%" + search + "%",
             deleted: showDeleted.current
-        }})
+        }}).then(({data}) => handleCredentialSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onCommentSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -398,7 +391,7 @@ export const SearchTabCredentialsPanel = (props) =>{
             fetchLimit: fetchLimit,
             comment: "%" + new_search + "%",
             deleted: showDeleted.current
-        }})
+        }}).then(({data}) => handleCredentialSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onTagSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -413,7 +406,7 @@ export const SearchTabCredentialsPanel = (props) =>{
                 fetchLimit: fetchLimit,
                 tag:  "%" + new_search + "%",
                 deleted: showDeleted.current
-            }})
+            }}).then(({data}) => handleCredentialSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onChangePage = (event, value) => {
         if(value === 1){

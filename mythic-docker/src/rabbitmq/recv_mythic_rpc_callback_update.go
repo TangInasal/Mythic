@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/its-a-feature/Mythic/utils"
 	"strings"
+	"time"
 
 	"github.com/its-a-feature/Mythic/database"
 	databaseStructs "github.com/its-a-feature/Mythic/database/structs"
@@ -33,6 +34,8 @@ type MythicRPCCallbackUpdateMessage struct {
 	Architecture                      *string   `json:"architecture,omitempty"`
 	Description                       *string   `json:"description,omitempty"`
 	ProcessName                       *string   `json:"process_name,omitempty"`
+	Cwd                               *string   `json:"cwd,omitempty"`
+	ImpersonationContext              *string   `json:"impersonation_context,omitempty"`
 	UpdateLastCheckinTime             *bool     `json:"update_last_checkin_time,omitempty"`
 	UpdateLastCheckinTimeViaC2Profile *string   `json:"update_last_checkin_time_via_c2_profile,omitempty"`
 }
@@ -155,19 +158,32 @@ func MythicRPCCallbackUpdate(input MythicRPCCallbackUpdateMessage) MythicRPCCall
 			callback.ProcessShortName = processPieces.PathPieces[len(processPieces.PathPieces)-1]
 		}
 	}
+	if input.Cwd != nil {
+		callback.Cwd = *input.Cwd
+	}
+	if input.ImpersonationContext != nil {
+		callback.ImpersonationContext = *input.ImpersonationContext
+	}
 	if _, err := database.DB.NamedExec(`UPDATE callback SET
 		"user"=:user, host=:host, pid=:pid, ip=:ip, extra_info=:extra_info, sleep_info=:sleep_info, enc_key=:enc_key, dec_key=:dec_key, 
 		crypto_type=:crypto_type, external_ip=:external_ip, integrity_level=:integrity_level, os=:os, domain=:domain, architecture=:architecture, 
-		description=:description, process_name=:process_name, process_short_name=:process_short_name  
+		description=:description, process_name=:process_name, process_short_name=:process_short_name, cwd=:cwd,
+		impersonation_context=:impersonation_context
 		WHERE id=:id`, callback); err != nil {
 		logging.LogError(err, "Failed to update callback information")
 		response.Error = err.Error()
 		return response
 	}
 	if input.UpdateLastCheckinTime != nil && *input.UpdateLastCheckinTime {
-		if input.UpdateLastCheckinTimeViaC2Profile == nil {
-			response.Success = false
-			response.Error = "When asking to update the last checkin time, you must also supply the UpdateLastCheckinTimeViaC2Profile parameter with the name of the c2 profile that callback is using"
+		callback.LastCheckin = time.Now().UTC()
+		if input.UpdateLastCheckinTimeViaC2Profile == nil || *input.UpdateLastCheckinTimeViaC2Profile == "" {
+			_, err := database.DB.NamedExec(`UPDATE callback SET last_checkin=:last_checkin WHERE id=:id`, callback)
+			if err != nil {
+				response.Success = false
+				response.Error = err.Error()
+				return response
+			}
+			response.Success = true
 			return response
 		}
 		_, err := LookupEncryptionData(*input.UpdateLastCheckinTimeViaC2Profile, callback.AgentCallbackID, true)

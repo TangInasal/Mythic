@@ -33,6 +33,7 @@ import {useLazyQuery, gql, useMutation} from '@apollo/client';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import {copyStringToClipboard} from "../../utilities/Clipboard";
 import { DataGrid } from '@mui/x-data-grid';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 const createAPITokenMutation = gql`
 mutation createAPITokenMutation($operator_id: Int, $name: String){
@@ -107,14 +108,11 @@ export function SettingsOperatorTableRow(props){
     const [openSecretsConfig, setOpenSecretsConfig] = React.useState(false);
     const [showDeleted, setShowDeleted] = React.useState(false);
     const [apiTokens, setAPITokens] = React.useState([]);
-    const [queryAPITokens] = useLazyQuery(GetAPITokens, {
-        fetchPolicy: "no-cache",
-        onCompleted: (data) => {
-            setAPITokens(data.apitokens);
-        },
-        onError: (error) => {
-
-        }
+    const queryAPITokensSuccess = (data) => {
+        setAPITokens(data.apitokens);
+    }
+    const queryAPITokens = useMythicLazyQuery(GetAPITokens, {
+        fetchPolicy: "no-cache"
     });
     const [createAPIToken] = useMutation(createAPITokenMutation, {
         onCompleted: (data) => {
@@ -212,7 +210,8 @@ export function SettingsOperatorTableRow(props){
     }
     React.useEffect( () => {
         if(open){
-            queryAPITokens({variables: {operator_id: props.id}});
+            queryAPITokens({variables: {operator_id: props.id}})
+                .then(({data}) => queryAPITokensSuccess(data)).catch(({data}) => console.log(data));
         }
     }, [open]);
     return (
@@ -248,10 +247,12 @@ export function SettingsOperatorTableRow(props){
                     }
                 </MythicStyledTableCell>
                 <MythicStyledTableCell>
-                    <IconButton size="medium"
-                            disabled={!(isMe || props.userIsAdmin)}
-                           onClick={()=>{setOpenUpdateDialog(true);}}
-                           color="error" ><PasswordIcon /></IconButton>
+                    <MythicStyledTooltip title={"Adjust Username/Password"}>
+                        <IconButton size="medium"
+                                    disabled={!(isMe || props.userIsAdmin)}
+                                    onClick={()=>{setOpenUpdateDialog(true);}}
+                                    color="error" ><PasswordIcon /></IconButton>
+                    </MythicStyledTooltip>
                   {openUpdate &&
                     <MythicDialog open={openUpdate} 
                      onClose={()=>{setOpenUpdateDialog(false);}} 
@@ -275,12 +276,15 @@ export function SettingsOperatorTableRow(props){
                 <MythicStyledTableCell>
                   {((props.id === me.user.id) || (props.userIsAdmin && props.account_type === "bot")) &&
                       <>
-                        <IconButton style={{display: "inline-block"}} size="medium"
-                                    disabled={props.account_type === "bot"}
-                                    onClick={()=>{setOpenUIConfig(true);}}
-                                    color="info" variant='contained'>
-                            <SettingsIcon />
-                        </IconButton>
+                          <MythicStyledTooltip title={"Configure UI preferences"} tooltipStyle={{display: "inline-block"}}>
+                              <IconButton size="medium"
+                                          disabled={props.account_type === "bot"}
+                                          onClick={()=>{setOpenUIConfig(true);}}
+                                          color="info" variant='contained'>
+                                  <SettingsIcon />
+                              </IconButton>
+                          </MythicStyledTooltip>
+
                         {openUIConfig &&
                           <MythicDialog open={openUIConfig} onClose={()=>{setOpenUIConfig(false)}} maxWidth={"md"} fullWidth
                           innerDialog={<SettingsOperatorUIConfigDialog  onClose={()=>{setOpenUIConfig(false);}} {...props} />}
@@ -358,16 +362,21 @@ export function SettingsOperatorTableRow(props){
                         API Tokens
                       </Typography>
                         {showDeleted ? (
-                            <MythicStyledTooltip title={"Hide API Tokens"} style={{float: "right"}}>
+                            <MythicStyledTooltip title={"Hide API Tokens"} tooltipStyle={{float: "right"}}>
                                 <IconButton size="small" style={{float: "right"}} variant="contained" onClick={() => setShowDeleted(!showDeleted)}><VisibilityIcon /></IconButton>
                             </MythicStyledTooltip>
 
                         ) : (
-                            <MythicStyledTooltip title={"Show Deleted API Tokens"} style={{float: "right"}}>
+                            <MythicStyledTooltip title={"Show Deleted API Tokens"} tooltipStyle={{float: "right"}}>
                                 <IconButton size="small" style={{float: "right"}} variant="contained" onClick={() => setShowDeleted(!showDeleted)} ><VisibilityOffIcon /></IconButton>
                             </MythicStyledTooltip>
                         )}
-                      <Button size="small" onClick={() => {setOpenNewAPIToken(true)}} style={{float: "right"}} startIcon={<AddCircleOutlineOutlinedIcon color="success" />} variant="contained">New</Button>
+
+                      <Button size="small" onClick={() => {setOpenNewAPIToken(true)}} style={{marginRight: "20px", float: "right"}}
+                              variant={"contained"}
+                              startIcon={<AddCircleOutlineOutlinedIcon color="success" />} >
+                          API Token
+                      </Button>
                         {openNewAPIToken &&
                             <MythicDialog open={openNewAPIToken}
                                           fullWidth={true}
@@ -397,13 +406,13 @@ const columns = [
                 </IconButton>
             )
         ),
-        valueGetter: (params) => params.row.deleted
+        valueGetter: (value, row) => row.deleted
     },
     {
         field: 'active',
         headerName: 'Active',
         width: 80,
-        valueGetter: (params) => params.row.active,
+        valueGetter: (value, row) => row.active,
         renderCell: (params) => (
                 <Switch
                     color={ "info"}
@@ -419,17 +428,17 @@ const columns = [
         field: 'created_by',
         headerName: 'Created By',
         flex: 1,
-        valueGetter: (params) => params.row.created_by_operator?.username,
+        valueGetter: (value, row) => row.created_by_operator?.username,
     },
     {
         field: 'token',
         headerName: 'Token',
         width: 60,
-        valueGetter: (params) => params.row.token_value,
+        valueGetter: (value, row) => row.token_value,
         renderCell: (params) => (
             <MythicStyledTooltip title={"Copy to clipboard"} >
                 <IconButton onClick={() => params.row.onCopyTokenValue(params.row.token_value)} >
-                    <ContentCopyIcon color={"success"} />
+                    <ContentCopyIcon />
                 </IconButton>
             </MythicStyledTooltip>
         )
@@ -465,8 +474,8 @@ const columns = [
 
         ),
         sortable: false,
-        valueGetter: (params) => {
-            return params.row.eventstepinstance?.eventgroupinstance?.eventgroup?.name
+        valueGetter: (value, row) => {
+            return row.eventstepinstance?.eventgroupinstance?.eventgroup?.name
         }
     },
 ];
@@ -493,7 +502,6 @@ const APITokens = ({apiTokens, onDeleteAPIToken, onToggleActive, showDeleted}) =
     return (
         <div style={{display: "flex", flexDirection: "column", width: "100%", height: "calc(30vh)"}}>
             <DataGrid
-                getRowHeight={() => 'auto'}
                 rows={data}
                 columns={columns}
                 initialState={{

@@ -9,7 +9,7 @@ const (
 	CHECK_CONTAINER_STATUS_DELAY           = 10 * time.Second
 	TIME_FORMAT_STRING_YYYY_MM_DD          = "2006-01-02"
 	TIME_FORMAT_STRING_YYYY_MM_DD_HH_MM_SS = "2006-01-02 15:04:05 Z07"
-	RPC_TIMEOUT                            = 20 * time.Second
+	RPC_TIMEOUT                            = 5 * time.Second
 	TASK_STATUS_CONTAINER_DOWN             = "Error: Container Down"
 )
 
@@ -225,10 +225,17 @@ const (
 	// MYTHIC_RPC_PROXY_START proxy operations
 	MYTHIC_RPC_PROXY_START = "mythic_rpc_proxy_start"
 	MYTHIC_RPC_PROXY_STOP  = "mythic_rpc_proxy_stop"
+	// MYTHIC_RPC_TAG
+	MYTHIC_RPC_TAG_SEARCH = "mythic_rpc_tag_search"
+	MYTHIC_RPC_TAG_CREATE = "mythic_rpc_tag_create"
+	// MYTHIC_RPC_TAGTYPE
+	MYTHIC_RPC_TAGTYPE_GET_OR_CREATE = "mythic_rpc_tag_type_get_or_create"
 	// C2
 	MYTHIC_RPC_C2_UPDATE_STATUS = "mythic_rpc_c2_update_status"
 	//
 	MYTHIC_RPC_APITOKEN_CREATE = "mythic_rpc_apitoken_create"
+	// Agent Message
+	MYTHIC_RPC_HANDLE_AGENT_JSON = "mythic_rpc_handle_agent_json"
 	// MYTHIC_RPC_BLANK blank
 	MYTHIC_RPC_BLANK = "mythic_rpc_blank"
 )

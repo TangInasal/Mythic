@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useContext} from 'react';
-import {MythicTransferListDialog} from '../../MythicComponents/MythicTransferList';
 import {MythicDialog} from '../../MythicComponents/MythicDialog';
 import {
     exportCallbackConfigQuery,
@@ -10,14 +9,14 @@ import {
 import {snackActions} from '../../utilities/Snackbar';
 import {useMutation, useLazyQuery } from '@apollo/client';
 import {
-  CallbacksTableIDCell,
-  CallbacksTableStringCell,
-  CallbacksTableLastCheckinCell,
-  CallbacksTablePayloadTypeCell,
-  CallbacksTableC2Cell,
-  CallbacksTableOSCell,
-  CallbacksTableSleepCell,
-  CallbacksTableIPCell
+    CallbacksTableIDCell,
+    CallbacksTableStringCell,
+    CallbacksTableLastCheckinCell,
+    CallbacksTablePayloadTypeCell,
+    CallbacksTableC2Cell,
+    CallbacksTableOSCell,
+    CallbacksTableSleepCell,
+    CallbacksTableIPCell, CallbacksTableTagsCell
 } from './CallbacksTableRow';
 import MythicResizableGrid from '../../MythicComponents/MythicResizableGrid';
 import {TableFilterDialog} from './TableFilterDialog';
@@ -26,7 +25,7 @@ import {CallbacksTabsTaskMultipleDialog} from "./CallbacksTabsTaskMultipleDialog
 import ip6 from 'ip6';
 import {CallbacksContext, OnOpenTabContext, OnOpenTabsContext} from "./CallbacksTop";
 import {useTheme} from '@mui/material/styles';
-import {GetMythicSetting, useSetMythicSetting} from "../../MythicComponents/MythicSavedUserSetting";
+import {GetMythicSetting, useSetMythicSetting, GetComputedFontSize} from "../../MythicComponents/MythicSavedUserSetting";
 import {DetailedCallbackTable} from "./DetailedCallbackTable";
 import {ModifyCallbackMythicTreeGroupsDialog} from "./ModifyCallbackMythicTreeGroupsDialog";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -110,6 +109,7 @@ const callbackTableInitialColumns = [
     {key: "agent", type: 'agent', name: "Agent", width: 150},
     {key: "c2", type: 'string', name: "C2", width: 45, disableSort: true, disableFilterMenu: true, disableDoubleClick: true},
     {key: "process_short_name", type: 'string', name: "Process Name", fillWidth: true},
+    {key: "tags", type: 'tags', name: "Tags", fillWidth: false, disableDoubleClick: true, width: 150}
 ];
 function CallbacksTablePreMemo(props){
     const callbacks = useContext(CallbacksContext);
@@ -203,7 +203,7 @@ function CallbacksTablePreMemo(props){
     const [selectedColumn, setSelectedColumn] = React.useState({});
     const [columnVisibility, setColumnVisibility] = React.useState(() => {
         let defaults = {"visible": ["Interact", "Host", "Domain", "User", "Description", "Last Checkin", "Agent",  "IP", "PID"],
-            "hidden": ["Arch", "Sleep", "Process Name", "External IP", "C2",  "OS", "Groups"]}
+            "hidden": ["Arch", "Sleep", "Process Name", "External IP", "C2",  "OS", "Groups", "Tags"]}
         try {
             const storageItem = GetMythicSetting({setting_name: "callbacks_table_columns", default_value: operatorSettingDefaults.callbacks_table_columns});
 
@@ -765,7 +765,7 @@ function CallbacksTablePreMemo(props){
                                                                  rowStyle: {backgroundColor: `${row.color}`},
                                                              }} />;
                         case "User":
-                            return <CallbacksTableStringCell key={`callback${row.id}_${c.name}`} cellData={row.user}
+                            return <CallbacksTableStringCell key={`callback${row.id}_${c.name}`} cellData={row.user + (row.impersonation_context === "" ? "" : ` [${row.impersonation_context}]`)}
                                                              rowData={{...row,
                                                                  selected: row.id === clickedCallbackID,
                                                                  rowStyle: {backgroundColor: `${row.color}`},
@@ -832,6 +832,13 @@ function CallbacksTablePreMemo(props){
                         case "Process Name":
                             return <CallbacksTableStringCell key={`callback${row.id}_${c.name}`}
                                                              cellData={row.process_short_name}
+                                                             rowData={{...row,
+                                                                 selected: row.id === clickedCallbackID,
+                                                                 rowStyle: {backgroundColor: `${row.color}`},
+                                                             }} />;
+                        case "Tags":
+                            return <CallbacksTableTagsCell key={`callback${row.id}_${c.name}`}
+                                                             cellData={row.tags}
                                                              rowData={{...row,
                                                                  selected: row.id === clickedCallbackID,
                                                                  rowStyle: {backgroundColor: `${row.color}`},
@@ -906,7 +913,7 @@ function CallbacksTablePreMemo(props){
                 sortIndicatorIndex={sortColumn}
                 sortDirection={sortData.sortDirection}
                 items={sortedData}
-                rowHeight={20}
+                rowHeight={GetComputedFontSize() + 7}
                 onClickHeader={onClickHeader}
                 onDoubleClickRow={onRowDoubleClick}
                 contextMenuOptions={contextMenuOptions}

@@ -112,7 +112,7 @@ export function Step4C2Profiles(props){
                             })
                             
                             parameters.sort((a,b) => -b.description.localeCompare(a.description));
-                            return {...c2, "selected": props.prevData[p]["selected"], c2profileparameters: parameters};
+                            return {...c2, "selected": props.prevData[p]["selected"], c2profileparameters: parameters, "selected_instance": props.prevData[p]["selected_instance"]};
                         }
                     }
                 }
@@ -152,8 +152,8 @@ export function Step4C2Profiles(props){
         });
         if(allValid){
             //console.log(c2Profiles);
-            if(!includedC2){
-                //snackActions.warning("Must select at least one C2 to include");
+            if(!includedC2 && props.buildOptions["agent_type"] === "agent"){
+                // normal agents need to confirm they're not including c2, services can move through
                 setOpenConfirmDialog(true);
                 return;
             }
@@ -308,10 +308,10 @@ export function Step4C2Profiles(props){
                 <Table stickyHeader={true} size="small" style={{"maxWidth": "100%",}}>
                     <TableHead>
                         <TableRow>
-                            <TableCell style={{width: "4rem"}}>Include?</TableCell>
-                            <TableCell>C2 Name</TableCell>
-                            <TableCell>Pre-created Instances</TableCell>
-                            <TableCell>Description</TableCell>
+                            <MythicStyledTableCell style={{width: "4rem"}}>Include?</MythicStyledTableCell>
+                            <MythicStyledTableCell>C2 Name</MythicStyledTableCell>
+                            <MythicStyledTableCell>Pre-created Instances</MythicStyledTableCell>
+                            <MythicStyledTableCell>Description</MythicStyledTableCell>
                         </TableRow>
                     </TableHead>
 
@@ -359,14 +359,15 @@ export function Step4C2Profiles(props){
                                         </Typography>
                                     </MythicStyledTableCell>
                                 </TableRow>
-                                {c2.selected ? (
-                                    <TableRow><MythicStyledTableCell colSpan={4}>
-                                        <CreatePayloadC2ProfileParametersTable key={"step4table" + c2.id}
+                                {c2.selected &&
+                                    <TableRow>
+                                        <TableCell colSpan={4} style={{padding: "0px 0px 0px 0px !important", margin: "0px !important"}}>
+                                            <CreatePayloadC2ProfileParametersTable key={"step4table" + c2.id}
                                                                                returnAllDictValues={false} {...c2}
                                                                                onChange={updateC2Parameter}/>
-                                    </MythicStyledTableCell></TableRow>
+                                        </TableCell>
+                                    </TableRow>
 
-                                ) : null
                                 }
                             </TableBody>
                         ))

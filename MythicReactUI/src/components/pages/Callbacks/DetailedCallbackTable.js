@@ -28,14 +28,28 @@ import {Button, Link, IconButton} from '@mui/material';
 import {MythicAgentSVGIcon} from "../../MythicComponents/MythicAgentSVGIcon";
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import InfoIconOutline from '@mui/icons-material/InfoOutlined';
+import {MythicStyledTooltip} from "../../MythicComponents/MythicStyledTooltip";
+import {HostFileDialog} from "../Payloads/HostFileDialog";
+import PublicIcon from '@mui/icons-material/Public';
+import {payloadsCallbackAllowed} from "../Payloads/Payloads";
+import Switch from '@mui/material/Switch';
 
 const GET_Payload_Details = gql`
 query GetCallbackDetails($callback_id: Int!) {
   callback_by_pk(id: $callback_id){
+    tags {
+        tagtype {
+            name
+            color
+            id
+          }
+        id
+      }
     payload {
       uuid
       id
       creation_time
+      callback_allowed
       payloadtype{
           name
           agent_type
@@ -142,6 +156,8 @@ query GetCallbackDetails($callback_id: Int!) {
     process_name
     init_callback
     mythictree_groups
+    cwd
+    impersonation_context
   }
   
 }
@@ -169,6 +185,7 @@ mutation removeLoadedCommand($id: Int!){
 export function DetailedCallbackTable(props){
     const theme = useTheme();
     const me = useReactiveVar(meState);
+    const [openHostDialog, setOpenHostDialog] = React.useState(false);
     const [openDetailedView, setOpenDetailedView] = React.useState(false);
     const [openAddRemoveCommandsDialog, setOpenAddRemoveCommandsDialog] = React.useState(false);
     const [commands, setCommands] = React.useState([]);
@@ -206,6 +223,7 @@ export function DetailedCallbackTable(props){
         issueNextMod();
       }
     })
+    const [payloadCallbackAllowed, setPayloadCallbackAllowed] = React.useState(true);
     const issueNextMod = () => {
       if(commandMods.current.add >= addTotal.current){
         if(commandMods.current.remove >= removeTotal.current) {
@@ -282,8 +300,29 @@ export function DetailedCallbackTable(props){
                 }];
             }, []);
             setC2Profiles(c2ProfilesState);
+            setPayloadCallbackAllowed(data.callback_by_pk.payload.callback_allowed);
         }
         });
+    const [toggleCallbackAllowedMutation] = useMutation(payloadsCallbackAllowed, {
+        onCompleted: (data) => {
+            if(data.updatePayload.status === "success"){
+                setPayloadCallbackAllowed(data.updatePayload.callback_allowed);
+                if(data.updatePayload.callback_allowed){
+                    snackActions.success("New Callbacks allowed from this Payload");
+                } else {
+                    snackActions.warning("No new Callback allowed from this Payload");
+                }
+            } else {
+                console.log(data.updatePayload);
+            }
+        },
+        onError: (data) => {
+            console.log(data);
+        }
+    });
+    const onToggleCallbackAllowed = () => {
+        toggleCallbackAllowedMutation({variables: {payload_uuid: data.callback_by_pk.payload.uuid, callback_allowed: !payloadCallbackAllowed}})
+    }
     if (loading) {
      return <LinearProgress style={{marginTop: "10px"}}/>;
     }
@@ -351,7 +390,22 @@ export function DetailedCallbackTable(props){
                     ) : null }
                     <TableRow hover>
                         <TableCell>Download URL</TableCell>
-                        <TableCell>{window.location.origin + "/direct/download/" + data.callback_by_pk.payload.filemetum.agent_file_id}</TableCell>
+                        <TableCell style={{display: "flex", alignItems: "center"}}>
+                            <Link style={{wordBreak: "break-all"}} color="textPrimary" underline="always" href={"/direct/download/" + data.callback_by_pk.payload.filemetum.agent_file_id}>
+                                {window.location.origin + "/direct/download/" + data.callback_by_pk.payload.filemetum.agent_file_id}
+                            </Link>
+                            <MythicStyledTooltip title={"Host Payload Through C2"} >
+                                <PublicIcon color={"info"} style={{marginLeft: "20px", cursor: "pointer"}} onClick={()=>{setOpenHostDialog(true);}}  />
+                            </MythicStyledTooltip>
+                            {openHostDialog &&
+                                <MythicDialog fullWidth={true} maxWidth="md" open={openHostDialog}
+                                              onClose={()=>{setOpenHostDialog(false);}}
+                                              innerDialog={<HostFileDialog file_uuid={data.callback_by_pk.payload.filemetum.agent_file_id}
+                                                                           file_name={b64DecodeUnicode(data.callback_by_pk.payload.filemetum.filename_text)}
+                                                                           onClose={()=>{setOpenHostDialog(false);}} />}
+                                />
+                            }
+                        </TableCell>
                     </TableRow>
                     <TableRow hover>
                         <TableCell>SHA1</TableCell>
@@ -364,6 +418,18 @@ export function DetailedCallbackTable(props){
                     <TableRow hover>
                         <TableCell>Created By</TableCell>
                         <TableCell>{data.callback_by_pk.payload?.operator?.username}</TableCell>
+                    </TableRow>
+                    <TableRow hover>
+                        <TableCell>New Callbacks Allowed?</TableCell>
+                        <TableCell>
+                            <Switch
+                                checked={payloadCallbackAllowed}
+                                onChange={onToggleCallbackAllowed}
+                                color="info"
+                                inputProps={{'aria-label': 'primary checkbox'}}
+                                name="callback_allowed"
+                            />
+                        </TableCell>
                     </TableRow>
                     {data.callback_by_pk.payload?.eventstepinstance &&
                         <>

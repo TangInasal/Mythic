@@ -96,6 +96,17 @@ type Mutation {
 }
 
 type Mutation {
+  createArtifact(
+    task_id: Int
+    base_artifact: String!
+    artifact: String!
+    needs_cleanup: Boolean
+    resolved: Boolean
+    host: String
+  ): createArtifactOutput
+}
+
+type Mutation {
   createCallback(
     newCallback: newCallbackConfig
     payloadUuid: String!
@@ -155,6 +166,24 @@ type Mutation {
 }
 
 type Mutation {
+  createTag(
+    tagtype_id: Int!
+    data: jsonb
+    url: String
+    source: String
+    mythictree_id: Int
+    filemeta_id: Int
+    credential_id: Int
+    taskartifact_id: Int
+    keylog_id: Int
+    response_id: Int
+    task_id: Int
+    payload_id: Int
+    callback_id: Int
+  ): createTagOutput
+}
+
+type Mutation {
   createTask(
     command: String!
     payload_type: String
@@ -201,7 +230,8 @@ type Mutation {
 
 type Mutation {
   deleteFile(
-    file_id: Int!
+    file_id: Int
+    file_ids: [Int!]
   ): deletionOutput
 }
 
@@ -236,6 +266,7 @@ type Mutation {
     parameter_name: String!
     payload_type: String!
     callback: Int!
+    other_parameters: jsonb
   ): dynamicQueryOutput
 }
 
@@ -544,6 +575,16 @@ type Mutation {
   ): passwordUpdateOutput
 }
 
+type Mutation {
+  updatePayload(
+    payload_uuid: String!
+    callback_alert: Boolean
+    callback_allowed: Boolean
+    description: String
+    deleted: Boolean
+  ): updatePayloadOutput
+}
+
 input OperatorInput {
   username: String!
   password: String
@@ -720,8 +761,10 @@ type BulkDownloadOutput {
 
 type dynamicQueryOutput {
   status: String!
+  parameter_name: String!
   error: String
   choices: [String]
+  complex_choices: [dynamicQueryOutputChoice]
 }
 
 type rebuildOutput {
@@ -1169,5 +1212,33 @@ type eventingImportContainerWorkflowOutput {
   status: String!
   error: String
   eventgroup_id: Int
+}
+
+type createTagOutput {
+  status: String!
+  error: String
+  id: Int
+}
+
+type dynamicQueryOutputChoice {
+  display_value: String!
+  value: String!
+}
+
+type createArtifactOutput {
+  id: Int
+  status: String!
+  error: String
+}
+
+type updatePayloadOutput {
+  status: String!
+  error: String
+  callback_alert: Boolean
+  callback_allowed: Boolean
+  description: String
+  deleted: Boolean
+  id: Int
+  payload_uuid: String
 }
 

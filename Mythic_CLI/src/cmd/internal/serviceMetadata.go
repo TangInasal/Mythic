@@ -800,6 +800,12 @@ func Add3rdPartyService(service string, additionalConfigs map[string]interface{}
 	existingConfig["extra_hosts"] = []string{
 		"mythic_server:127.0.0.1",
 		"mythic_rabbitmq:127.0.0.1",
+		"mythic_nginx:127.0.0.1",
+		"mythic_react:127.0.0.1",
+		"mythic_documentation:127.0.0.1",
+		"mythic_graphql:127.0.0.1",
+		"mythic_jupyter:127.0.0.1",
+		"mythic_postgres:127.0.0.1",
 	}
 	/*
 		pStruct := map[string]interface{}{
@@ -874,6 +880,9 @@ func Add3rdPartyService(service string, additionalConfigs map[string]interface{}
 		"MYTHIC_SERVER_HOST=${MYTHIC_SERVER_HOST}",
 		"MYTHIC_SERVER_PORT=${MYTHIC_SERVER_PORT}",
 		"MYTHIC_SERVER_GRPC_PORT=${MYTHIC_SERVER_GRPC_PORT}",
+		"NGINX_HOST=${NGINX_HOST}",
+		"NGINX_PORT=${NGINX_PORT}",
+		"NGINX_USE_SSL=${NGINX_USE_SSL}",
 		"WEBHOOK_DEFAULT_URL=${WEBHOOK_DEFAULT_URL}",
 		"WEBHOOK_DEFAULT_CALLBACK_CHANNEL=${WEBHOOK_DEFAULT_CALLBACK_CHANNEL}",
 		"WEBHOOK_DEFAULT_FEEDBACK_CHANNEL=${WEBHOOK_DEFAULT_FEEDBACK_CHANNEL}",

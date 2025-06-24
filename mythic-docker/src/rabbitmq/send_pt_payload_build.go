@@ -141,45 +141,80 @@ func RegisterNewPayload(payloadDefinition PayloadConfiguration, operatorOperatio
 		logging.LogError(err, "Failed to create new payload object for creating payload")
 		return "", 0, err
 	}
-	go emitPayloadLog(databasePayload.ID)
-
-	// now that we have a payload, we need to handle adding build parameters
-	buildParameters, err := associateBuildParametersWithPayload(databasePayload, payloadDefinition.BuildParameters)
-	if err != nil {
-		logging.LogError(err, "Failed to associate build parameters with new payload")
-		database.UpdatePayloadWithError(databasePayload, err)
-		return "", 0, err
-	}
-	// if this isn't a wrapper payload, we need to handle c2 profiles and commands
-	if !payloadtype.Wrapper {
-		c2Profiles, err := associateC2ProfilesWithPayload(databasePayload, payloadDefinition.C2Profiles)
+	go func() {
+		// now that we have a payload, we need to handle adding build parameters
+		buildParameters, err := associateBuildParametersWithPayload(databasePayload, payloadDefinition.BuildParameters)
 		if err != nil {
-			logging.LogError(err, "Failed to associated C2 Profiles with Payload", "c2_profiles", payloadDefinition.C2Profiles)
+			logging.LogError(err, "Failed to associate build parameters with new payload")
 			database.UpdatePayloadWithError(databasePayload, err)
-			return "", 0, err
+			return
 		}
-		buildCommands, err := associateCommandsWithPayload(databasePayload, payloadDefinition.Commands, buildParameters)
+		// if this isn't a wrapper payload, we need to handle c2 profiles and commands
+		if !payloadtype.Wrapper {
+			c2Profiles, err := associateC2ProfilesWithPayload(databasePayload, payloadDefinition.C2Profiles)
+			if err != nil {
+				logging.LogError(err, "Failed to associated C2 Profiles with Payload", "c2_profiles", payloadDefinition.C2Profiles)
+				database.UpdatePayloadWithError(databasePayload, err)
+				return
+			}
+			buildCommands, err := associateCommandsWithPayload(databasePayload, payloadDefinition.Commands, payloadDefinition.CommandGroups, buildParameters)
+			if err != nil {
+				logging.LogError(err, "Failed to associate commands with Payload", "commands", payloadDefinition.Commands)
+				database.UpdatePayloadWithError(databasePayload, err)
+				return
+			}
+			// we've successfully registered the payload, c2 profiles, and commands in the database
+			// now to send all of it over to the container for building
+			rabbitmqPayloadBuildMsg := PayloadBuildMessage{
+				PayloadType:     payloadtype.Name,
+				CommandList:     buildCommands,
+				BuildParameters: buildParameters,
+				C2Profiles:      c2Profiles,
+				SelectedOS:      databasePayload.Os,
+				PayloadUUID:     databasePayload.UuID,
+				OperationID:     operatorOperation.CurrentOperation.ID,
+				OperatorID:      operatorOperation.CurrentOperator.ID,
+				PayloadFileUUID: fileMeta.AgentFileID,
+				Filename:        payloadDefinition.Filename,
+				Secrets:         GetSecrets(operatorOperation.CurrentOperator.ID, payloadDefinition.EventStepInstance),
+			}
+			SendPayloadBuildMessage(databasePayload, rabbitmqPayloadBuildMsg)
+			EventingChannel <- EventNotification{
+				Trigger:             eventing.TriggerPayloadBuildStart,
+				PayloadID:           databasePayload.ID,
+				EventStepInstanceID: payloadDefinition.EventStepInstance,
+				OperationID:         operatorOperation.CurrentOperation.ID,
+				OperatorID:          operatorOperation.CurrentOperator.ID,
+			}
+			return
+		}
+		// now that we have the databasePayload.WrappedPayloadID value
+		// we need to get the corresponding file path and read the contents of the file
+		err = database.DB.Get(&wrappedPayload, `SELECT
+			payload.id, payload.uuid,
+			filemeta.path "filemeta.path"
+			FROM payload
+			JOIN filemeta on payload.file_id = filemeta.id
+			WHERE payload.id=$1 AND payload.deleted=false`, databasePayload.WrappedPayloadID)
 		if err != nil {
-			logging.LogError(err, "Failed to associate commands with Payload", "commands", payloadDefinition.Commands)
+			logging.LogError(err, "Failed to get information about wrapped payload")
 			database.UpdatePayloadWithError(databasePayload, err)
-			return "", 0, err
+			return
 		}
-		// we've successfully registered the payload, c2 profiles, and commands in the database
-		// now to send all of it over to the container for building
+		// to pass along as part of the wrapper build process
 		rabbitmqPayloadBuildMsg := PayloadBuildMessage{
-			PayloadType:     payloadtype.Name,
-			CommandList:     buildCommands,
-			BuildParameters: buildParameters,
-			C2Profiles:      c2Profiles,
-			SelectedOS:      databasePayload.Os,
-			PayloadUUID:     databasePayload.UuID,
-			OperationID:     operatorOperation.CurrentOperation.ID,
-			OperatorID:      operatorOperation.CurrentOperator.ID,
-			PayloadFileUUID: fileMeta.AgentFileID,
-			Filename:        payloadDefinition.Filename,
-			Secrets:         GetSecrets(operatorOperation.CurrentOperator.ID, payloadDefinition.EventStepInstance),
+			PayloadType:        payloadtype.Name,
+			WrappedPayloadUUID: &wrappedPayload.UuID,
+			BuildParameters:    buildParameters,
+			SelectedOS:         databasePayload.Os,
+			PayloadUUID:        databasePayload.UuID,
+			OperationID:        operatorOperation.CurrentOperation.ID,
+			OperatorID:         operatorOperation.CurrentOperator.ID,
+			PayloadFileUUID:    fileMeta.AgentFileID,
+			Filename:           string(fileMeta.Filename),
+			Secrets:            GetSecrets(operatorOperation.CurrentOperator.ID, payloadDefinition.EventStepInstance),
 		}
-		SendPayloadBuildMessage(databasePayload, rabbitmqPayloadBuildMsg)
+		go SendPayloadBuildMessage(databasePayload, rabbitmqPayloadBuildMsg)
 		EventingChannel <- EventNotification{
 			Trigger:             eventing.TriggerPayloadBuildStart,
 			PayloadID:           databasePayload.ID,
@@ -187,42 +222,8 @@ func RegisterNewPayload(payloadDefinition PayloadConfiguration, operatorOperatio
 			OperationID:         operatorOperation.CurrentOperation.ID,
 			OperatorID:          operatorOperation.CurrentOperator.ID,
 		}
-		return databasePayload.UuID, databasePayload.ID, nil
-	}
-	// now that we have the databasePayload.WrappedPayloadID value
-	// we need to get the corresponding file path and read the contents of the file
-	err = database.DB.Get(&wrappedPayload, `SELECT
-			payload.id, payload.uuid,
-			filemeta.path "filemeta.path"
-			FROM payload
-			JOIN filemeta on payload.file_id = filemeta.id
-			WHERE payload.id=$1 AND payload.deleted=false`, databasePayload.WrappedPayloadID)
-	if err != nil {
-		logging.LogError(err, "Failed to get information about wrapped payload")
-		database.UpdatePayloadWithError(databasePayload, err)
-		return "", 0, err
-	}
-	// to pass along as part of the wrapper build process
-	rabbitmqPayloadBuildMsg := PayloadBuildMessage{
-		PayloadType:        payloadtype.Name,
-		WrappedPayloadUUID: &wrappedPayload.UuID,
-		BuildParameters:    buildParameters,
-		SelectedOS:         databasePayload.Os,
-		PayloadUUID:        databasePayload.UuID,
-		OperationID:        operatorOperation.CurrentOperation.ID,
-		OperatorID:         operatorOperation.CurrentOperator.ID,
-		PayloadFileUUID:    fileMeta.AgentFileID,
-		Filename:           string(fileMeta.Filename),
-		Secrets:            GetSecrets(operatorOperation.CurrentOperator.ID, payloadDefinition.EventStepInstance),
-	}
-	go SendPayloadBuildMessage(databasePayload, rabbitmqPayloadBuildMsg)
-	EventingChannel <- EventNotification{
-		Trigger:             eventing.TriggerPayloadBuildStart,
-		PayloadID:           databasePayload.ID,
-		EventStepInstanceID: payloadDefinition.EventStepInstance,
-		OperationID:         operatorOperation.CurrentOperation.ID,
-		OperatorID:          operatorOperation.CurrentOperator.ID,
-	}
+		return
+	}()
 	return databasePayload.UuID, databasePayload.ID, nil
 }
 
@@ -299,11 +300,8 @@ func SendPayloadBuildMessage(databasePayload databaseStructs.Payload, buildMessa
 		}
 		if !c2.IsP2P {
 			buildOutput += fmt.Sprintf("Step 3/%d - Issuing Start command\n", totalSteps)
-			if c2StartServerResponse, err := RabbitMQConnection.SendC2RPCStartServer(C2StartServerMessage{
-				Name: c2.Name,
-			}); err != nil {
-				buildOutput += err.Error() + "\n"
-			} else if !c2StartServerResponse.Success {
+			c2StartServerResponse := autoStartC2Profile(databaseStructs.C2profile{Name: c2.Name, ID: c2.ID})
+			if !c2StartServerResponse.Success {
 				buildOutput += c2StartServerResponse.Error + "\n"
 			} else {
 				buildOutput += c2StartServerResponse.Message + "\n"
@@ -328,6 +326,7 @@ func SendPayloadBuildMessage(databasePayload databaseStructs.Payload, buildMessa
 		}
 		return
 	}
+	logging.LogDebug("Sending build message to container", "payload", buildMessage.PayloadType)
 	err := RabbitMQConnection.SendStructMessage(
 		MYTHIC_EXCHANGE,
 		GetPtBuildRoutingKey(buildMessage.PayloadType),
@@ -361,5 +360,4 @@ func SendPayloadBuildMessage(databasePayload databaseStructs.Payload, buildMessa
 	if updateError != nil {
 		logging.LogError(updateError, "Failed to update payload's build message")
 	}
-
 }

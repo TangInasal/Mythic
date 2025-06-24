@@ -8,6 +8,7 @@ import Switch from '@mui/material/Switch';
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
+import Link from '@mui/material/Link';
 import TableContainer from '@mui/material/TableContainer';
 import Typography from '@mui/material/Typography';
 import {HexColorInput, HexColorPicker} from 'react-colorful';
@@ -17,7 +18,7 @@ import Select from '@mui/material/Select';
 import Input from '@mui/material/Input';
 import IconButton from '@mui/material/IconButton';
 import MythicStyledTableCell from "../../MythicComponents/MythicTableCell";
-import { operatorSettingDefaults} from "../../../cache";
+import {operatorSettingDefaults, taskTimestampDisplayFieldOptions} from "../../../cache";
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {MythicStyledTooltip} from "../../MythicComponents/MythicStyledTooltip";
@@ -34,10 +35,22 @@ const interactTypeOptions = [
     {value: "interactConsole", display: "Console Like"}
 ];
 const commonFontFamilies = [
-    "Verdana",
+    operatorSettingDefaults.fontFamily,
     "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\",\"Segoe UI Symbol\"",
     "Monaco"
-]
+];
+const isValidColor = (color) =>{
+    if(typeof color !== "string"){
+        return false;
+    }
+    if(color.length !== 7){
+        return false;
+    }
+    if(color[0] !== "#"){
+        return false;
+    }
+    return true;
+}
 export function SettingsOperatorUIConfigDialog(props) {
     const fileInputRef = React.useRef(null);
     const backgroundFileImageLightRef = React.useRef(null);
@@ -104,80 +117,109 @@ export function SettingsOperatorUIConfigDialog(props) {
     const initialUseDisplayParamsForCLIHistory = GetMythicSetting({setting_name: "useDisplayParamsForCLIHistory", default_value: operatorSettingDefaults.useDisplayParamsForCLIHistory});
     const [useDisplayParamsForCLIHistory, setUseDisplayParamsForCLIHistory] = React.useState(initialUseDisplayParamsForCLIHistory);
 
+    const initialTaskTimestampDisplayField = GetMythicSetting({setting_name: "taskTimestampDisplayField", default_value: operatorSettingDefaults.taskTimestampDisplayField});
+    const [taskTimestampDisplayField, setTaskTimestampDisplayField] = React.useState(initialTaskTimestampDisplayField);
+
+    const initialHideBrowserTasking = GetMythicSetting({setting_name: "hideBrowserTasking", default_value: operatorSettingDefaults.hideBrowserTasking});
+    const [hideBrowserTasking, setHideBrowserTasking] = React.useState(initialHideBrowserTasking);
+
+    const initialHideTaskingContext = GetMythicSetting({setting_name: "hideTaskingContext", default_value: operatorSettingDefaults.hideTaskingContext});
+    const [hideTaskingContext, setHideTaskingContext] = React.useState(initialHideTaskingContext);
+
     const initialPalette = GetMythicSetting({setting_name: 'palette', default_value: operatorSettingDefaults.palette});
     const [palette, setPalette] = React.useState({
         primary: {
-            dark: initialPalette?.primary?.dark || operatorSettingDefaults.palette.primary.dark,
-            light: initialPalette?.primary?.light || operatorSettingDefaults.palette.primary.light,
+            dark: isValidColor(initialPalette?.primary?.dark) ? initialPalette?.primary?.dark : operatorSettingDefaults.palette.primary.dark,
+            light: isValidColor(initialPalette?.primary?.light) ? initialPalette?.primary?.light : operatorSettingDefaults.palette.primary.light,
         },
         error: {
-            dark: initialPalette?.error?.dark || operatorSettingDefaults.palette.error.dark,
-            light: initialPalette?.error?.light || operatorSettingDefaults.palette.error.light,
+            dark: isValidColor(initialPalette?.error?.dark) ? initialPalette?.error?.dark : operatorSettingDefaults.palette.error.dark,
+            light: isValidColor(initialPalette?.error?.light) ? initialPalette?.error?.light : operatorSettingDefaults.palette.error.light,
         },
         success: {
-            dark: initialPalette?.success?.dark || operatorSettingDefaults.palette.success.dark,
-            light: initialPalette?.success?.light || operatorSettingDefaults.palette.success.light,
+            dark: isValidColor(initialPalette?.success?.dark) ? initialPalette?.success?.dark : operatorSettingDefaults.palette.success.dark,
+            light: isValidColor(initialPalette?.success?.light) ? initialPalette?.success?.light : operatorSettingDefaults.palette.success.light,
         },
         info: {
-            dark: initialPalette?.info?.dark || operatorSettingDefaults.palette.info.dark,
-            light: initialPalette?.info?.light || operatorSettingDefaults.palette.info.light,
+            dark: isValidColor(initialPalette?.info?.dark) ? initialPalette?.info?.dark : operatorSettingDefaults.palette.info.dark,
+            light: isValidColor(initialPalette?.info?.light) ? initialPalette?.info?.light : operatorSettingDefaults.palette.info.light,
         },
         warning: {
-            dark: initialPalette?.warning?.dark || operatorSettingDefaults.palette.warning.dark,
-            light: initialPalette?.warning?.light || operatorSettingDefaults.palette.warning.light,
+            dark: isValidColor(initialPalette?.warning?.dark) ? initialPalette?.warning?.dark : operatorSettingDefaults.palette.warning.dark,
+            light: isValidColor(initialPalette?.warning?.light) ? initialPalette?.warning?.light : operatorSettingDefaults.palette.warning.light,
         },
         secondary: {
-            dark: initialPalette?.secondary?.dark || operatorSettingDefaults.palette.secondary.dark,
-            light: initialPalette?.secondary?.light || operatorSettingDefaults.palette.secondary.light,
+            dark: isValidColor(initialPalette?.secondary?.dark) ? initialPalette?.secondary?.dark : operatorSettingDefaults.palette.secondary.dark,
+            light: isValidColor(initialPalette?.secondary?.light) ? initialPalette?.secondary?.light : operatorSettingDefaults.palette.secondary.light,
         },
         background: {
-            dark: initialPalette?.background?.dark || operatorSettingDefaults.palette.background.dark,
-            light: initialPalette?.background?.light || operatorSettingDefaults.palette.background.light,
+            dark: isValidColor(initialPalette?.background?.dark) ? initialPalette?.background?.dark : operatorSettingDefaults.palette.background.dark,
+            light: isValidColor(initialPalette?.background?.light) ? initialPalette?.background?.light : operatorSettingDefaults.palette.background.light,
         },
         tableHeader: {
-            dark: initialPalette?.tableHeader?.dark || operatorSettingDefaults.palette.tableHeader.dark,
-            light: initialPalette?.tableHeader?.light || operatorSettingDefaults.palette.tableHeader.light,
+            dark: isValidColor(initialPalette?.tableHeader?.dark) ? initialPalette?.tableHeader?.dark : operatorSettingDefaults.palette.tableHeader.dark,
+            light: isValidColor(initialPalette?.tableHeader?.light) ? initialPalette?.tableHeader?.light : operatorSettingDefaults.palette.tableHeader.light,
         },
         tableHover: {
-            dark: initialPalette?.tableHover?.dark || operatorSettingDefaults.palette.tableHover.dark,
-            light: initialPalette?.tableHover?.light || operatorSettingDefaults.palette.tableHover.light,
+            dark: isValidColor(initialPalette?.tableHover?.dark) ? initialPalette?.tableHover?.dark : operatorSettingDefaults.palette.tableHover.dark,
+            light: isValidColor(initialPalette?.tableHover?.light) ? initialPalette?.tableHover?.light : operatorSettingDefaults.palette.tableHover.light,
         },
         pageHeader: {
-            dark: initialPalette?.pageHeader?.dark || operatorSettingDefaults.palette.pageHeader.dark,
-            light: initialPalette?.pageHeader?.light || operatorSettingDefaults.palette.pageHeader.light,
+            dark: isValidColor(initialPalette?.pageHeader?.dark) ? initialPalette?.pageHeader?.dark : operatorSettingDefaults.palette.pageHeader.dark,
+            light: isValidColor(initialPalette?.pageHeader?.light) ? initialPalette?.pageHeader?.light : operatorSettingDefaults.palette.pageHeader.light,
         },
         text: {
-            dark: initialPalette?.text?.dark || operatorSettingDefaults.palette.text.dark,
-            light: initialPalette?.text?.light || operatorSettingDefaults.palette.text.light,
+            dark: isValidColor(initialPalette?.text?.dark) ? initialPalette?.text?.dark : operatorSettingDefaults.palette.text.dark,
+            light: isValidColor(initialPalette?.text?.light) ? initialPalette?.text?.light : operatorSettingDefaults.palette.text.light,
         },
         paper: {
-            dark: initialPalette?.paper?.dark || operatorSettingDefaults.palette.paper.dark,
-            light: initialPalette?.paper?.light || operatorSettingDefaults.palette.paper.light,
+            dark: isValidColor(initialPalette?.paper?.dark) ? initialPalette?.paper?.dark : operatorSettingDefaults.palette.paper.dark,
+            light: isValidColor(initialPalette?.paper?.light) ? initialPalette?.paper?.light : operatorSettingDefaults.palette.paper.light,
         },
         selectedCallbackColor: {
-            dark: initialPalette?.selectedCallbackColor?.dark || operatorSettingDefaults.palette.selectedCallbackColor.dark,
-            light: initialPalette?.selectedCallbackColor?.light || operatorSettingDefaults.palette.selectedCallbackColor.light,
+            dark: isValidColor(initialPalette?.selectedCallbackColor?.dark) ? initialPalette?.selectedCallbackColor?.dark : operatorSettingDefaults.palette.selectedCallbackColor.dark,
+            light: isValidColor(initialPalette?.selectedCallbackColor?.light) ? initialPalette?.selectedCallbackColor?.light : operatorSettingDefaults.palette.selectedCallbackColor.light,
         },
         selectedCallbackHierarchyColor: {
-            dark: initialPalette?.selectedCallbackHierarchyColor?.dark || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.dark,
-            light: initialPalette?.selectedCallbackHierarchyColor?.light || operatorSettingDefaults.palette.selectedCallbackHierarchyColor.light,
+            dark: isValidColor(initialPalette?.selectedCallbackHierarchyColor?.dark) ? initialPalette?.selectedCallbackHierarchyColor?.dark : operatorSettingDefaults.palette.selectedCallbackHierarchyColor.dark,
+            light: isValidColor(initialPalette?.selectedCallbackHierarchyColor?.light) ? initialPalette?.selectedCallbackHierarchyColor?.light : operatorSettingDefaults.palette.selectedCallbackHierarchyColor.light,
         },
         backgroundImage: {
             dark: initialPalette?.backgroundImage?.dark || operatorSettingDefaults.palette.backgroundImage.dark,
             light: initialPalette?.backgroundImage?.light || operatorSettingDefaults.palette.backgroundImage.light,
         },
         navBarIcons: {
-            dark: initialPalette?.navBarIcons?.dark || operatorSettingDefaults.palette.navBarIcons.dark,
-            light: initialPalette?.navBarIcons?.light || operatorSettingDefaults.palette.navBarIcons.light,
+            dark: isValidColor(initialPalette?.navBarIcons?.dark) ? initialPalette?.navBarIcons?.dark : operatorSettingDefaults.palette.navBarIcons.dark,
+            light: isValidColor(initialPalette?.navBarIcons?.light) ? initialPalette?.navBarIcons?.light : operatorSettingDefaults.palette.navBarIcons.light,
         },
         navBarText: {
-            dark: initialPalette?.navBarText?.dark || operatorSettingDefaults.palette.navBarText.dark,
-            light: initialPalette?.navBarText?.light || operatorSettingDefaults.palette.navBarText.light,
+            dark: isValidColor(initialPalette?.navBarText?.dark) ? initialPalette?.navBarText?.dark : operatorSettingDefaults.palette.navBarText.dark,
+            light: isValidColor(initialPalette?.navBarText?.light) ? initialPalette?.navBarText?.light : operatorSettingDefaults.palette.navBarText.light,
         },
         navBarColor: {
-            dark: initialPalette?.navBarColor?.dark || operatorSettingDefaults.palette.navBarColor.dark,
-            light: initialPalette?.navBarColor?.light || operatorSettingDefaults.palette.navBarColor.light,
-        }
+            dark: isValidColor(initialPalette?.navBarColor?.dark) ? initialPalette?.navBarColor?.dark : operatorSettingDefaults.palette.navBarColor.dark,
+            light: isValidColor(initialPalette?.navBarColor?.light) ? initialPalette?.navBarColor?.light : operatorSettingDefaults.palette.navBarColor.light,
+        },
+        taskPromptTextColor: {
+            dark: isValidColor(initialPalette?.taskPromptTextColor?.dark) ? initialPalette?.taskPromptTextColor?.dark : operatorSettingDefaults.palette.taskPromptTextColor.dark,
+            light: isValidColor(initialPalette?.taskPromptTextColor?.light) ? initialPalette?.taskPromptTextColor?.light : operatorSettingDefaults.palette.taskPromptTextColor.light,
+        },
+        taskPromptCommandTextColor: {
+            dark: isValidColor(initialPalette?.taskPromptCommandTextColor?.dark) ? initialPalette?.taskPromptCommandTextColor?.dark : operatorSettingDefaults.palette.taskPromptCommandTextColor.dark,
+            light: isValidColor(initialPalette?.taskPromptCommandTextColor?.light) ? initialPalette?.taskPromptCommandTextColor?.light : operatorSettingDefaults.palette.taskPromptCommandTextColor.light,
+        },
+        taskContextCwdColor: {
+            dark: isValidColor(initialPalette?.taskContextCwdColor?.dark) ? initialPalette?.taskContextCwdColor?.dark : operatorSettingDefaults.palette.taskContextCwdColor.dark,
+            light: isValidColor(initialPalette?.taskContextCwdColor?.light) ? initialPalette?.taskContextCwdColor?.light : operatorSettingDefaults.palette.taskContextCwdColor.light,
+        },
+        taskContextImpersonationColor: {
+            dark: isValidColor(initialPalette?.taskContextImpersonationColor?.dark) ? initialPalette?.taskContextImpersonationColor?.dark : operatorSettingDefaults.palette.taskContextImpersonationColor.dark,
+            light: isValidColor(initialPalette?.taskContextImpersonationColor?.light) ? initialPalette?.taskContextImpersonationColor?.light : operatorSettingDefaults.palette.taskContextImpersonationColor.light,
+        },
+        taskContextExtraColor: {
+            dark: isValidColor(initialPalette?.taskContextExtraColor?.dark) ? initialPalette?.taskContextExtraColor?.dark : operatorSettingDefaults.palette.taskContextExtraColor.dark,
+            light: isValidColor(initialPalette?.taskContextExtraColor?.light) ? initialPalette?.taskContextExtraColor?.light : operatorSettingDefaults.palette.taskContextExtraColor.light,
+        },
     });
     const paletteOptionsSolidColor = [
         {name: "primary", display: "Primary"},
@@ -186,7 +228,9 @@ export function SettingsOperatorUIConfigDialog(props) {
         {name: "info", display: "Informational"},
         {name: "success", display: "Success"},
         {name: "secondary", display: "Secondary"},
-        {name: "pageHeader", display: "Page Headers"}
+        {name: "pageHeader", display: "Page Headers"},
+        {name: "taskPromptTextColor", display: "Tasking Prompt Text"},
+        {name: "taskPromptCommandTextColor", display: "Tasking Command and Parameter Text"}
     ];
     const paletteOptionsTextColor = [
         {name: "tableHeader", display: "Table Headers"},
@@ -194,7 +238,10 @@ export function SettingsOperatorUIConfigDialog(props) {
         {name: "selectedCallbackColor", display: "Currently active callback row highlight"},
         {name: "selectedCallbackHierarchyColor", display: "Current Host highlight in tree views"},
         {name: "paper", display: "Menu and Modals Background"},
-        {name: "background", display: "Background"}
+        {name: "background", display: "Background"},
+        {name: "taskContextCwdColor", display: "Tasking Context Dir Background Color"},
+        {name: "taskContextImpersonationColor", display: "Tasking Context User Background Color"},
+        {name: "taskContextExtraColor", display: "Tasking Context Extra Info Background Color"}
     ]
     const [resumeNotifications, setResumeNotifications] = React.useState(false);
     const [_, updateSettings, clearSettings] = useSetMythicSetting();
@@ -210,6 +257,12 @@ export function SettingsOperatorUIConfigDialog(props) {
     const onShowIPChanged = (evt) => {
         setShowIP(!showIP);
     }
+    const onHideBrowserTaskingChanged = (evt) => {
+        setHideBrowserTasking(!hideBrowserTasking);
+    }
+    const onHideTaskingContextChanged = (evt) => {
+        setHideTaskingContext(!hideTaskingContext);
+    }
     const onShowHostnameChanged = (evt) => {
         setShowHostname(!showHostname);
     }
@@ -224,6 +277,9 @@ export function SettingsOperatorUIConfigDialog(props) {
     }
     const onChangeInteractType = (evt) => {
         setInteractType(evt.target.value);
+    }
+    const onChangeTaskTimestampDisplayField = (evt) => {
+        setTaskTimestampDisplayField(evt.target.value);
     }
     const onChangeUseDisplayParamsForCLIHistory = (evt) => {
         setUseDisplayParamsForCLIHistory(!useDisplayParamsForCLIHistory);
@@ -244,11 +300,14 @@ export function SettingsOperatorUIConfigDialog(props) {
               showIP,
               showHostname,
               showCallbackGroups,
-              fontSize,
+              fontSize: parseInt(fontSize),
               fontFamily,
               showMedia,
               interactType,
               useDisplayParamsForCLIHistory,
+              taskTimestampDisplayField,
+              hideBrowserTasking,
+              hideTaskingContext,
               palette: palette
       }});
       props.onClose();
@@ -270,6 +329,8 @@ export function SettingsOperatorUIConfigDialog(props) {
       setUseDisplayParamsForCLIHistory(operatorSettingDefaults.useDisplayParamsForCLIHistory);
       setResumeNotifications(false);
       setPalette(operatorSettingDefaults.palette);
+      setTaskTimestampDisplayField(operatorSettingDefaults.taskTimestampDisplayField);
+      setHideTaskingContext(operatorSettingDefaults.hideTaskingContext);
     }
     const clearAllUserSettings = () => {
         clearSettings();
@@ -348,7 +409,9 @@ export function SettingsOperatorUIConfigDialog(props) {
                     </IconButton>
                 </MythicStyledTooltip>
             </div>
-
+            <Typography variant={"body2"}>
+                Community themes are located on <Link target={"_blank"} href={"https://github.com/MythicMeta/CommunityThemes"}>GitHub</Link>
+            </Typography>
         </DialogTitle>
         <TableContainer className="mythicElement" style={{paddingLeft: "10px", paddingRight: "10px"}}>
           <Table size="small" style={{ "maxWidth": "100%", "overflow": "scroll"}}>
@@ -475,6 +538,48 @@ export function SettingsOperatorUIConfigDialog(props) {
                                   <MenuItem value={opt.value} key={opt.value}>{opt.display}</MenuItem>
                               ) )}
                           </Select>
+                      </MythicStyledTableCell>
+                  </TableRow>
+                  <TableRow hover>
+                      <MythicStyledTableCell>
+                          Choose Which Timestamp to display for Tasks
+                      </MythicStyledTableCell>
+                      <MythicStyledTableCell>
+                          <Select
+                              labelId="demo-dialog-select-label"
+                              id="demo-dialog-select"
+                              value={taskTimestampDisplayField}
+                              onChange={onChangeTaskTimestampDisplayField}
+                              input={<Input style={{width: "100%"}}/>}
+                          >
+                              {taskTimestampDisplayFieldOptions.map( (opt) => (
+                                  <MenuItem value={opt.name} key={opt.name}>{opt.display}</MenuItem>
+                              ) )}
+                          </Select>
+                      </MythicStyledTableCell>
+                  </TableRow>
+                  <TableRow hover>
+                      <MythicStyledTableCell>Hide Browser-based Tasking</MythicStyledTableCell>
+                      <MythicStyledTableCell>
+                          <Switch
+                              checked={hideBrowserTasking}
+                              onChange={onHideBrowserTaskingChanged}
+                              color="info"
+                              inputProps={{ 'aria-label': 'info checkbox' }}
+                              name="hideBrowserTasking"
+                          />
+                      </MythicStyledTableCell>
+                  </TableRow>
+                  <TableRow hover>
+                      <MythicStyledTableCell>Hide Tasking Context Tabs</MythicStyledTableCell>
+                      <MythicStyledTableCell>
+                          <Switch
+                              checked={hideTaskingContext}
+                              onChange={onHideTaskingContextChanged}
+                              color="info"
+                              inputProps={{ 'aria-label': 'info checkbox' }}
+                              name="hideTaskingContext"
+                          />
                       </MythicStyledTableCell>
                   </TableRow>
                   <TableRow>

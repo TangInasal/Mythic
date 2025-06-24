@@ -128,7 +128,7 @@ subscription GetEventGroups {
   }
 }
  `;
-const initialWorkflow = `name: "New Eventing Workflow"
+export const initialWorkflow = `name: "New Eventing Workflow"
 description: "automatically do something based on a new callback"
 trigger: callback_new
 trigger_data:
@@ -256,9 +256,9 @@ export function Eventing({me}){
                             <Paper style={{marginBottom: "5px"}}>
                                 <MythicStyledTooltip title={"Upload complete workflow files"} >
                                     <Button size={"small"} style={{display: "inline-flex", marginRight: "10px", marginLeft: "10px", marginTop: "5px"}}
-                                            color={"info"} component="label"
+                                            color={"info"} component="label" startIcon={<CloudUploadIcon  />}
                                     >
-                                        <CloudUploadIcon style={{marginRight: "5px"}} />
+
                                         Upload
                                         <input onChange={onFileChange} type="file" multiple hidden/>
                                     </Button>
@@ -266,8 +266,9 @@ export function Eventing({me}){
                                 <MythicStyledTooltip title={"Create Workflow with Text Editor"} >
                                     <Button size={"small"}  color={"success"}
                                             style={{display: "inline-flex", marginRight: "10px", marginLeft: "10px", marginTop: "5px"}}
-                                            onClick={()=>setOpenTestModal(true)}>
-                                        <AddCircleIcon style={{marginRight: "5px"}} />
+                                            onClick={()=>setOpenTestModal(true)}
+                                            startIcon={<AddCircleIcon  />}
+                                    >
                                         Create New
                                     </Button>
                                 </MythicStyledTooltip>
@@ -285,7 +286,7 @@ export function Eventing({me}){
                                                   }}/>}
                                 />
                             }
-                            <ListItem button onClick={() => setSelectedEventGroup({id: 0})}
+                            <ListItem onClick={() => setSelectedEventGroup({id: 0})}
                                 style={selectedEventGroup.id === 0 ?
                                     {paddingTop: 0, paddingBottom: 0, borderLeft: `5px solid ${theme.palette.info.main}`} :
                                     {paddingTop: 0, paddingBottom: 0}}>
@@ -310,7 +311,7 @@ export function Eventing({me}){
                                 }>
                                     {eventgroups.map( (e, i) => (
                                         (showDeleted || !e.deleted) &&
-                                        <ListItem key={e.id + e.name} button onClick={() => setSelectedEventGroup(e)}
+                                        <ListItem key={e.id + e.name} onClick={() => setSelectedEventGroup(e)}
                                                   style={selectedEventGroup.id === e.id ?
                                                       {paddingTop: 0, paddingBottom: 0, borderLeft: `5px solid ${theme.palette.info.main}`} :
                                                       {paddingTop: 0, paddingBottom: 0}}>

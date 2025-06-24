@@ -89,7 +89,7 @@ export const CallbacksTabsTaskingPanel = ({tabInfo, index, value, onCloseTab, pa
     const [commandInfo, setCommandInfo] = React.useState({});
     const [taskingData, setTaskingData] = React.useState({task: []});
     const taskingDataRef = React.useRef({task: []});
-    const [fromNow, setFromNow] = React.useState(getSkewedNow());
+    const [fromNow, setFromNow] = React.useState(getSkewedNow().toISOString());
     const [selectedToken, setSelectedToken] = React.useState({});
     const [filterOptions, setFilterOptions] = React.useState({
         "operatorsList": [],
@@ -270,7 +270,7 @@ export const CallbacksTabsTaskingPanel = ({tabInfo, index, value, onCloseTab, pa
         getInfiniteScrollTasking({variables: {callback_id: tabInfo.callbackID, offset: taskingData.task.length, fetchLimit}});
     }
     const onSubmitCommandLine = (message, cmd, parsed, force_parsed_popup, cmdGroupNames, previousTaskingLocation) => {
-        //console.log(message, cmd, parsed);
+        console.log(message, cmd, parsed);
         let params = message.split(" ");
         delete params[0];
         params = params.join(" ").trim();

@@ -14,10 +14,11 @@ import { Typography } from '@mui/material';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import {ProcessTable} from "./ProcessTable";
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 
 const mythictreeFragment = gql`
-fragment mythictreeData on mythictree{
+fragment mythictreeProcessSearchData on mythictree{
     comment
     deleted
     full_path_text
@@ -52,7 +53,7 @@ query nameProcessQuery($pid: String!, $host: String!, $offset: Int!, $fetchLimit
       }
     }
     mythictree(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {host: {_ilike: $host}, full_path_text: {_ilike: $pid}, tree_type: {_eq: "process"}}) {
-      ...mythictreeData
+      ...mythictreeProcessSearchData
     }
   }
 `;
@@ -65,21 +66,21 @@ query nameProcessQuery($name: String!, $host: String!, $offset: Int!, $fetchLimi
       }
     }
     mythictree(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {host: {_ilike: $host}, name_text: {_ilike: $name}, tree_type: {_eq: "process"}}) {
-      ...mythictreeData
+      ...mythictreeProcessSearchData
     }
   }
 `;
 const tagSearch = gql`
 ${mythictreeFragment}
 query tagProcessQuery($tag: String!, $host: String!, $offset: Int!, $fetchLimit: Int!) {
-    tag_aggregate(distinct_on: id, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, tree_type: {_eq: "process"}}}) {
+    tag_aggregate(distinct_on: mythictree_id, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, tree_type: {_eq: "process"}}}) {
       aggregate {
         count
       }
     }
-    tag(limit: $fetchLimit, distinct_on: id, offset: $offset, order_by: {id: desc}, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, tree_type: {_eq: "process"}}}) {
+    tag(limit: $fetchLimit, distinct_on: mythictree_id, offset: $offset, order_by: {mythictree_id: desc}, where: {mythictree_id: {_is_null: false}, _or: [{data: {_cast: {String: {_ilike: $tag}}}}, {tagtype: {name: {_ilike: $tag}}}], mythictree: {host: {_ilike: $host}, tree_type: {_eq: "process"}}}) {
       mythictree {
-        ...mythictreeData
+        ...mythictreeProcessSearchData
       }
       
     }
@@ -160,11 +161,11 @@ const SearchTabProcessesSearchPanel = (props) => {
     }, [props.value, props.index]);
     return (
         <Grid container spacing={1} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <MythicTextField placeholder="Host Name Search..." value={searchHost}
                                  onChange={handleSearchHostValueChange} onEnter={submitSearch} name="Host Name Search..." />
             </Grid>
-            <Grid item xs={3}>
+            <Grid size={3}>
                 <MythicTextField placeholder="Search..." value={search}
                                  onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..." InputProps={{
                     endAdornment:
@@ -176,7 +177,7 @@ const SearchTabProcessesSearchPanel = (props) => {
                     style: {padding: 0}
                 }}/>
             </Grid>
-            <Grid item xs={2}>
+            <Grid size={2}>
                 <Select
                     style={{marginBottom: "10px", width: "100%"}}
                     value={searchField}
@@ -215,7 +216,7 @@ export const SearchTabProcessPanel = (props) =>{
                 break;
         }
     }
-    const handleKeylogSearchResults = (data) => {
+    const handleSearchResults = (data) => {
         snackActions.dismiss();
         if(searchField === "Tag"){
             setTotalCount(data.tag_aggregate.aggregate.count);
@@ -231,23 +232,14 @@ export const SearchTabProcessPanel = (props) =>{
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getNameSearch] = useLazyQuery(nameSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleKeylogSearchResults,
-        onError: handleCallbackSearchFailure
+    const getNameSearch = useMythicLazyQuery(nameSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getPidSearch] = useLazyQuery(pidSearch, {
+    const getPidSearch = useMythicLazyQuery(pidSearch, {
         fetchPolicy: "no-cache",
-        onCompleted: handleKeylogSearchResults,
-        onError: handleCallbackSearchFailure
     })
-    const [getTagSearch] = useLazyQuery(tagSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleKeylogSearchResults,
-        onError: (data) => {
-            snackActions.error("Failed to fetch data for search");
-            console.log(data);
-        }
+    const getTagSearch = useMythicLazyQuery(tagSearch, {
+        fetchPolicy: "no-cache"
     })
     const onNameSearch = ({search, searchHost, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -262,7 +254,7 @@ export const SearchTabProcessPanel = (props) =>{
             fetchLimit: fetchLimit,
             name: "%" + new_search + "%",
             host: "%" + searchHost + "%",
-        }})
+        }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onPidSearch = ({search, searchHost, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -277,7 +269,7 @@ export const SearchTabProcessPanel = (props) =>{
             fetchLimit: fetchLimit,
             pid: "%" + new_search + "%",
             host: "%" + searchHost + "%",
-        }})
+        }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onTagSearch = ({search, searchHost, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -292,7 +284,7 @@ export const SearchTabProcessPanel = (props) =>{
                 fetchLimit: fetchLimit,
                 tag: "%" + new_search + "%",
                 host: "%" + searchHost + "%",
-            }})
+            }}).then(({data}) => handleSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onChangePage = (event, value) => {
         switch(searchField){

@@ -146,6 +146,8 @@ type CommandAttribute struct {
 	CommandIsSuggested                              bool                   `json:"suggested_command" mapstructure:"suggested_command"`
 	CommandCanOnlyBeLoadedLater                     bool                   `json:"load_only" mapstructure:"load_only"`
 	FilterCommandAvailabilityByAgentBuildParameters map[string]string      `json:"filter_by_build_parameter" mapstructure:"filter_by_build_parameter"`
+	Dependencies                                    []string               `json:"dependencies" mapstructure:"dependencies"`
+	Groups                                          []string               `json:"groups" mapstructure:"groups"`
 	AdditionalAttributes                            map[string]interface{} `json:"additional_items" mapstructure:",remain"`
 }
 
@@ -207,7 +209,8 @@ func payloadTypeSync(in PayloadTypeSyncMessage) error {
 	if in.PayloadType.Name == "" {
 		logging.LogError(nil, "Can't have payload container with empty name - bad sync")
 		return errors.New("Can't have payload container with empty name - bad sync")
-	} else if !isValidContainerVersion(in.ContainerVersion) {
+	}
+	if !isValidContainerVersion(in.ContainerVersion) {
 		logging.LogError(nil, "attempting to sync bad payload container version")
 		return errors.New(fmt.Sprintf("Version, %s, isn't supported. The max supported version is %s. \nThis likely means your PyPi or Golang library is out of date and should be updated.", in.ContainerVersion, validContainerVersionMax))
 	}

@@ -17,7 +17,8 @@ type TagType struct {
 
 type Tag struct {
 	ID                  int               `db:"id"`
-	TagType             int               `db:"tagtype_id"`
+	TagTypeID           int               `db:"tagtype_id"`
+	TagType             TagType           `db:"tagtype"`
 	Data                MythicJSONText    `db:"data"`
 	URL                 string            `db:"url"`
 	Operation           int               `db:"operation_id"`
@@ -32,4 +33,6 @@ type Tag struct {
 	TaskArtifact sql.NullInt64 `db:"taskartifact_id"`
 	Keylog       sql.NullInt64 `db:"keylog_id"`
 	Response     sql.NullInt64 `db:"response_id"`
+	Callback     sql.NullInt64 `db:"callback_id"`
+	Payload      sql.NullInt64 `db:"payload_id"`
 }

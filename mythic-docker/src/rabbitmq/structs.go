@@ -25,6 +25,7 @@ type PayloadConfiguration struct {
 	C2Profiles         *[]PayloadConfigurationC2Profile      `json:"c2_profiles,omitempty" mapstructure:"c2_profiles"`
 	BuildParameters    *[]PayloadConfigurationBuildParameter `json:"build_parameters,omitempty" mapstructure:"build_parameters"`
 	Commands           []string                              `json:"commands,omitempty" mapstructure:"commands"`
+	CommandGroups      []string                              `json:"command_groups,omitempty" mapstructure:"command_groups"`
 	SelectedOS         string                                `json:"selected_os" mapstructure:"selected_os" binding:"required"`
 	Filename           string                                `json:"filename" mapstructure:"filename" binding:"required"`
 	WrappedPayloadUUID string                                `json:"wrapped_payload,omitemtpy" mapstructure:"wrapped_payload"`
@@ -111,35 +112,37 @@ type PTTaskMessageTaskData struct {
 }
 
 type PTTaskMessageCallbackData struct {
-	ID                  int      `json:"id"`
-	DisplayID           int      `json:"display_id"`
-	AgentCallbackID     string   `json:"agent_callback_id"`
-	InitCallback        string   `json:"init_callback"`
-	LastCheckin         string   `json:"last_checkin"`
-	User                string   `json:"user"`
-	Host                string   `json:"host"`
-	PID                 int      `json:"pid"`
-	IP                  string   `json:"ip"`
-	IPs                 []string `json:"ips"`
-	ExternalIp          string   `json:"external_ip"`
-	ProcessName         string   `json:"process_name"`
-	Description         string   `json:"description"`
-	OperatorID          int      `json:"operator_id"`
-	OperatorUsername    string   `json:"operator_username"`
-	Active              bool     `json:"active"`
-	RegisteredPayloadID int      `json:"registered_payload_id"`
-	IntegrityLevel      int      `json:"integrity_level"`
-	Locked              bool     `json:"locked"`
-	OperationID         int      `json:"operation_id"`
-	OperationName       string   `json:"operation_name"`
-	CryptoType          string   `json:"crypto_type"`
-	DecKey              []byte   `json:"dec_key"`
-	EncKey              []byte   `json:"enc_key"`
-	Os                  string   `json:"os"`
-	Architecture        string   `json:"architecture"`
-	Domain              string   `json:"domain"`
-	ExtraInfo           string   `json:"extra_info"`
-	SleepInfo           string   `json:"sleep_info"`
+	ID                   int      `json:"id"`
+	DisplayID            int      `json:"display_id"`
+	AgentCallbackID      string   `json:"agent_callback_id"`
+	InitCallback         string   `json:"init_callback"`
+	LastCheckin          string   `json:"last_checkin"`
+	User                 string   `json:"user"`
+	Host                 string   `json:"host"`
+	PID                  int      `json:"pid"`
+	IP                   string   `json:"ip"`
+	IPs                  []string `json:"ips"`
+	ExternalIp           string   `json:"external_ip"`
+	ProcessName          string   `json:"process_name"`
+	Description          string   `json:"description"`
+	OperatorID           int      `json:"operator_id"`
+	OperatorUsername     string   `json:"operator_username"`
+	Active               bool     `json:"active"`
+	RegisteredPayloadID  int      `json:"registered_payload_id"`
+	IntegrityLevel       int      `json:"integrity_level"`
+	Locked               bool     `json:"locked"`
+	OperationID          int      `json:"operation_id"`
+	OperationName        string   `json:"operation_name"`
+	CryptoType           string   `json:"crypto_type"`
+	DecKey               []byte   `json:"dec_key"`
+	EncKey               []byte   `json:"enc_key"`
+	Os                   string   `json:"os"`
+	Architecture         string   `json:"architecture"`
+	Domain               string   `json:"domain"`
+	ExtraInfo            string   `json:"extra_info"`
+	SleepInfo            string   `json:"sleep_info"`
+	ImpersonationContext string   `json:"impersonation_context"`
+	Cwd                  string   `json:"cwd"`
 }
 
 type PTTaskMessagePayloadData struct {
@@ -151,27 +154,28 @@ type PTTaskMessagePayloadData struct {
 type PT_TASK_FUNCTION_STATUS = string
 
 const (
-	PT_TASK_FUNCTION_STATUS_OPSEC_PRE                        PT_TASK_FUNCTION_STATUS = "OPSEC Pre Check Running..."
-	PT_TASK_FUNCTION_STATUS_OPSEC_PRE_ERROR                                          = "Error: processing arguments - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_OPSEC_PRE_BLOCKED                                        = "OPSEC Pre Blocked"
-	PT_TASK_FUNCTION_STATUS_PREPROCESSING                                            = "creating task..."
-	PT_TASK_FUNCTION_STATUS_PREPROCESSING_ERROR                                      = "Error: creating task - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_OPSEC_POST                                               = "OPSEC Post Check Running..."
-	PT_TASK_FUNCTION_STATUS_OPSEC_POST_ERROR                                         = "Error: opsec check - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_OPSEC_POST_BLOCKED                                       = "OPSEC Post Blocked"
-	PT_TASK_FUNCTION_STATUS_SUBMITTED                                                = "submitted"
-	PT_TASK_FUNCTION_STATUS_PROCESSING                                               = "agent processing"
-	PT_TASK_FUNCTION_STATUS_DELEGATING                                               = "delegating tasks..."
-	PT_TASK_FUNCTION_STATUS_COMPLETION_FUNCTION                                      = "Completion Function Running..."
-	PT_TASK_FUNCTION_STATUS_COMPLETION_FUNCTION_ERROR                                = "Error: completion function - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_SUBTASK_COMPLETED_FUNCTION                               = "SubTask Completion Function Running..."
-	PT_TASK_FUNCTION_STATUS_SUBTASK_COMPLETED_FUNCTION_ERROR                         = "Error: subtask completion function - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_GROUP_COMPLETED_FUNCTION                                 = "Group Completion Function Running..."
-	PT_TASK_FUNCTION_STATUS_GROUP_COMPLETED_FUNCTION_ERROR                           = "Error: group completion function - click cog to check stderr"
-	PT_TASK_FUNCTION_STATUS_COMPLETED                                                = "success"
-	PT_TASK_FUNCTION_STATUS_PROCESSED                                                = "processed, waiting for more messages..."
-	PT_TASK_FUNCTION_STATUS_INTERCEPTED                                              = "intercepted for custom checks"
-	PT_TASK_FUNCTION_STATUS_INTERCEPTED_ERROR                                        = "Error: Task Interception Failed"
+	PT_TASK_FUNCTION_STATUS_OPSEC_PRE                           PT_TASK_FUNCTION_STATUS = "OPSEC Pre Check Running..."
+	PT_TASK_FUNCTION_STATUS_OPSEC_PRE_ERROR                                             = "Error: processing arguments"
+	PT_TASK_FUNCTION_STATUS_OPSEC_PRE_BLOCKED                                           = "OPSEC Pre Blocked"
+	PT_TASK_FUNCTION_STATUS_PREPROCESSING                                               = "preparing task for agent..."
+	PT_TASK_FUNCTION_STATUS_PREPROCESSING_ERROR                                         = "Error: creating task "
+	PT_TASK_FUNCTION_STATUS_OPSEC_POST                                                  = "OPSEC Post Check Running..."
+	PT_TASK_FUNCTION_STATUS_OPSEC_POST_ERROR                                            = "Error: opsec check failed to run"
+	PT_TASK_FUNCTION_STATUS_OPSEC_POST_BLOCKED                                          = "OPSEC Post Blocked"
+	PT_TASK_FUNCTION_STATUS_SUBMITTED                                                   = "submitted"
+	PT_TASK_FUNCTION_STATUS_PROCESSING                                                  = "agent processing"
+	PT_TASK_FUNCTION_STATUS_DELEGATING                                                  = "delegating tasks..."
+	PT_TASK_FUNCTION_STATUS_COMPLETION_FUNCTION                                         = "Completion Function Running..."
+	PT_TASK_FUNCTION_STATUS_COMPLETION_FUNCTION_ERROR                                   = "Error: completion function - click cog to check stderr"
+	PT_TASK_FUNCTION_STATUS_SUBTASK_COMPLETED_FUNCTION                                  = "SubTask Completion Function Running..."
+	PT_TASK_FUNCTION_STATUS_SUBTASK_COMPLETED_FUNCTION_ERROR                            = "Error: subtask completion function - click cog to check stderr"
+	PT_TASK_FUNCTION_STATUS_GROUP_COMPLETED_FUNCTION                                    = "Group Completion Function Running..."
+	PT_TASK_FUNCTION_STATUS_GROUP_COMPLETED_FUNCTION_ERROR                              = "Error: group completion function - click cog to check stderr"
+	PT_TASK_FUNCTION_STATUS_COMPLETED                                                   = "success"
+	PT_TASK_FUNCTION_STATUS_PROCESSED                                                   = "processed, agent sending responses..."
+	PT_TASK_FUNCTION_STATUS_INTERCEPTED                                                 = "intercepted for custom checks"
+	PT_TASK_FUNCTION_STATUS_INTERCEPTED_ERROR                                           = "Error: Task Interception Failed"
+	PT_TASK_SUPPORTED_UI_FEATURE_TASK_PROCESS_INTERACTIVE_TASKS                         = "task:process_interactive_tasks"
 )
 
 // Tasking step 1:

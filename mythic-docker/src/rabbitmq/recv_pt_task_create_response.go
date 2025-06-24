@@ -116,9 +116,13 @@ func processPtTaskCreateMessages(msg amqp.Delivery) {
 		task.StatusTimestampProcessed.Time = task.Timestamp
 		updateColumns = append(updateColumns, "status_timestamp_processed=:status_timestamp_processed")
 	} else {
-		if task.Status == PT_TASK_FUNCTION_STATUS_PREPROCESSING && payloadMsg.Success {
-			task.Status = PT_TASK_FUNCTION_STATUS_OPSEC_POST
-		} else if task.Status == PT_TASK_FUNCTION_STATUS_PREPROCESSING && !payloadMsg.Success {
+		if payloadMsg.Success {
+			if task.IsInteractiveTask {
+				task.Status = PT_TASK_FUNCTION_STATUS_SUBMITTED
+			} else {
+				task.Status = PT_TASK_FUNCTION_STATUS_OPSEC_POST
+			}
+		} else {
 			if payloadMsg.TaskStatus != nil {
 				task.Status = *payloadMsg.TaskStatus
 			} else {
@@ -145,6 +149,11 @@ func processPtTaskCreateMessages(msg amqp.Delivery) {
 				if payloadMsg.CommandName != nil && *payloadMsg.CommandName != "" {
 					allTaskData.Task.CommandName = *payloadMsg.CommandName
 				}
+				_, err = database.DB.Exec(`UPDATE task SET command_payload_type=$1, process_at_original_command=false
+					WHERE id=$2`, allTaskData.CommandPayloadType, task.ID)
+				if err != nil {
+					logging.LogError(err, "failed to update command_payload_type based on ReprocessAtNewCommandPayloadType")
+				}
 				logging.LogInfo("sending task back to create tasking", "payload type", allTaskData.CommandPayloadType,
 					"command name", allTaskData.Task.CommandName)
 				err = RabbitMQConnection.SendPtTaskCreate(allTaskData)
@@ -168,6 +177,9 @@ func processPtTaskCreateMessages(msg amqp.Delivery) {
 				ActionSuccess:       !strings.Contains(strings.ToLower(task.Status), "error"),
 			}
 			go CheckAndProcessTaskCompletionHandlers(task.ID)
+		} else if task.IsInteractiveTask {
+			// we're not completed and we are an interactive task, send it down to the agent
+			go submittedTasksAwaitingFetching.addTask(task)
 		}
 	} else {
 		task.Completed = true

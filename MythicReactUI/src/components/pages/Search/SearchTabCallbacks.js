@@ -14,6 +14,7 @@ import { Typography } from '@mui/material';
 import {CallbackSearchTable} from './CallbackSearchTable';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
 
 const callbackFragment = gql`
 fragment callbackSearchData on callback{
@@ -219,7 +220,7 @@ const SearchTabCallbacksSearchPanel = (props) => {
     }, [props.value, props.index])
     return (
         <Grid container spacing={2} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={6}>
+            <Grid size={6}>
                 <MythicTextField placeholder="Search..." value={search}
                     onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..." InputProps={{
                         endAdornment: 
@@ -231,7 +232,7 @@ const SearchTabCallbacksSearchPanel = (props) => {
                         style: {padding: 0}
                     }}/>
             </Grid>
-            <Grid item xs={6}>
+            <Grid size={6}>
                 <Select
                     style={{marginBottom: "10px", width: "15rem"}}
                     value={searchField}
@@ -292,45 +293,29 @@ export const SearchTabCallbacksPanel = (props) =>{
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getUserSearch] = useLazyQuery(userSearch, {
+    const getUserSearch = useMythicLazyQuery(userSearch, {
         fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
     })
-    const [getDomainSearch] = useLazyQuery(domainSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getDomainSearch = useMythicLazyQuery(domainSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getDescriptionSearch] = useLazyQuery(descriptionSearch, {
+    const getDescriptionSearch = useMythicLazyQuery(descriptionSearch, {
         fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
     })
-    const [getHostSearch] = useLazyQuery(hostSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getHostSearch = useMythicLazyQuery(hostSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getIPSearch] = useLazyQuery(ipSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getIPSearch = useMythicLazyQuery(ipSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getGroupSearch] = useLazyQuery(groupSearch, {
+    const getGroupSearch = useMythicLazyQuery(groupSearch, {
         fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
     })
-    const [getPayloadTypeSearch] = useLazyQuery(payloadtypeSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getPayloadTypeSearch = useMythicLazyQuery(payloadtypeSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getCallbackDisplayIDSearch] = useLazyQuery(callbackDisplayIDSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getCallbackDisplayIDSearch = useMythicLazyQuery(callbackDisplayIDSearch, {
+        fetchPolicy: "no-cache"
     })
     const onUserSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -344,7 +329,7 @@ export const SearchTabCallbacksPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             user: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onDomainSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -358,7 +343,7 @@ export const SearchTabCallbacksPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             domain: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onHostSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -372,7 +357,7 @@ export const SearchTabCallbacksPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             host: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onDescriptionSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -386,7 +371,7 @@ export const SearchTabCallbacksPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             description: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onIPSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -400,7 +385,7 @@ export const SearchTabCallbacksPanel = (props) =>{
             offset: offset,
             fetchLimit: fetchLimit,
             ip: "%" + new_search + "%",
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onGroupSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -413,7 +398,7 @@ export const SearchTabCallbacksPanel = (props) =>{
                 offset: offset,
                 fetchLimit: fetchLimit,
                 group: "%" + new_search + "%",
-            }})
+            }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onPayloadTypeSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -427,7 +412,7 @@ export const SearchTabCallbacksPanel = (props) =>{
                 offset: offset,
                 fetchLimit: fetchLimit,
                 payloadtype: "%" + new_search + "%",
-            }})
+            }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onCallbackDisplayIDSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -443,7 +428,7 @@ export const SearchTabCallbacksPanel = (props) =>{
                     offset: offset,
                     fetchLimit: fetchLimit,
                     callbackDisplayID: new_search,
-                }})
+                }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
         }catch(error){
             snackActions.warning("ID must be an integer");
         }

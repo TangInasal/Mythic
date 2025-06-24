@@ -7,13 +7,16 @@ import SearchIcon from '@mui/icons-material/Search';
 import Tooltip from '@mui/material/Tooltip';
 import {useTheme} from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
-import { gql, useLazyQuery} from '@apollo/client';
+import { gql, useMutation} from '@apollo/client';
 import { snackActions } from '../../utilities/Snackbar';
 import Pagination from '@mui/material/Pagination';
-import { Typography } from '@mui/material';
+import { Typography, Button } from '@mui/material';
 import {ArtifactTable} from './ArtifactTable';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
+import {useMythicLazyQuery} from "../../utilities/useMythicLazyQuery";
+import {MythicDialog} from "../../MythicComponents/MythicDialog";
+import {ArtifactTableNewArtifactDialog} from "./ArtifactTableNewArtifactDialog";
 
 const artifactFragment = gql`
 fragment artifactData on taskartifact{
@@ -135,6 +138,15 @@ query taskQuery($callback_id: Int!, $offset: Int!, $fetchLimit: Int!, $needs_cle
     }
 }
 `;
+const createArtifactMutation = gql`
+mutation createNewArtifact($task_id: Int, $base_artifact: String!, $artifact: String!, $needs_cleanup: Boolean, $resolved: Boolean, $host: String){
+    createArtifact(task_id: $task_id, base_artifact: $base_artifact, artifact: $artifact, needs_cleanup: $needs_cleanup, resolved: $resolved, host: $host){
+        id
+        status
+        error
+    }
+}
+`;
 
 export function SearchTabArtifactsLabel(props){
     return (
@@ -149,6 +161,19 @@ const SearchTabArtifactsSearchPanel = (props) => {
     const searchFieldOptions = ["Artifact", "Command", "Host", "Type", "Task", "Callback", "Operator"];
     const CleanupOptions = ["All Artifacts", "Needs Cleanup", "Already Cleaned"];
     const [cleanupField, setCleanupField] = React.useState("All Artifacts");
+    const [createArtifactDialogOpen, setCreateArtifactDialogOpen] = React.useState(false);
+    const [createArtifact] = useMutation(createArtifactMutation, {
+        onCompleted: (data) => {
+            if(data.createArtifact.status === "success"){
+                snackActions.info("Successfully created artifact");
+            } else {
+                snackActions.error(data.createArtifact.error);
+            }
+        },
+        onError: (error) => {
+
+        }
+    });
     const handleSearchFieldChange = (event) => {
         setSearchField(event.target.value);
         props.onChangeSearchField(event.target.value);
@@ -190,6 +215,9 @@ const SearchTabArtifactsSearchPanel = (props) => {
                 break;
         }
     }
+    const onCreateArtifact = ({base_artifact, artifact, needs_cleanup, resolved, host}) => {
+        createArtifact({variables: {base_artifact, artifact, needs_cleanup, resolved, host}})
+    }
     React.useEffect(() => {
         if(props.value === props.index){
             let queryParams = new URLSearchParams(window.location.search);
@@ -213,7 +241,7 @@ const SearchTabArtifactsSearchPanel = (props) => {
     }, [props.value, props.index])
     return (
         <Grid container spacing={2} style={{paddingTop: "10px", paddingLeft: "10px", maxWidth: "100%"}}>
-            <Grid item xs={6}>
+            <Grid size={6}>
                 <MythicTextField placeholder="Search..." value={search}
                     onChange={handleSearchValueChange} onEnter={submitSearch} name="Search..." InputProps={{
                         endAdornment: 
@@ -225,7 +253,7 @@ const SearchTabArtifactsSearchPanel = (props) => {
                         style: {padding: 0}
                     }}/>
             </Grid>
-            <Grid item xs={6}>
+            <Grid size={5}>
                 <Select
                     style={{marginBottom: "10px", width: "15rem"}}
                     value={searchField}
@@ -248,6 +276,20 @@ const SearchTabArtifactsSearchPanel = (props) => {
                         ))
                     }
                 </Select>
+            </Grid>
+            <Grid size={1}>
+                {createArtifactDialogOpen &&
+                    <MythicDialog fullWidth={true} maxWidth="md" open={createArtifactDialogOpen}
+                                  onClose={()=>{setCreateArtifactDialogOpen(false);}}
+                                  innerDialog={<ArtifactTableNewArtifactDialog onSubmit={onCreateArtifact} onClose={()=>{setCreateArtifactDialogOpen(false);}} />}
+                    />
+                }
+
+                <Button  style={{marginRight: "5px"}}
+                         size="small" color="success" onClick={ () => {setCreateArtifactDialogOpen(true);}} variant="contained">
+                    <FingerprintIcon style={{marginRight: "5px"}} />
+                    New
+                </Button>
             </Grid>
         </Grid>
     );
@@ -300,40 +342,26 @@ export const SearchTabArtifactsPanel = (props) =>{
         snackActions.error("Failed to fetch data for search");
         console.log(data);
     }
-    const [getArtifactSearch] = useLazyQuery(artifactSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getArtifactSearch = useMythicLazyQuery(artifactSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getCommandSearch] = useLazyQuery(commandSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getCommandSearch = useMythicLazyQuery(commandSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getTypeSearch] = useLazyQuery(typeSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getTypeSearch = useMythicLazyQuery(typeSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getHostSearch] = useLazyQuery(hostSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getHostSearch = useMythicLazyQuery(hostSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getTaskSearch] = useLazyQuery(taskSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getTaskSearch = useMythicLazyQuery(taskSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getCallbackSearch] = useLazyQuery(callbackSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getCallbackSearch = useMythicLazyQuery(callbackSearch, {
+        fetchPolicy: "no-cache"
     })
-    const [getOperatorSearch] = useLazyQuery(operatorSearch, {
-        fetchPolicy: "no-cache",
-        onCompleted: handleCallbackSearchResults,
-        onError: handleCallbackSearchFailure
+    const getOperatorSearch = useMythicLazyQuery(operatorSearch, {
+        fetchPolicy: "no-cache"
     });
     const getCleanupSearchOptions = () => {
         switch(cleanupField.current){
@@ -359,7 +387,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             artifact: "%" + new_search + "%",
             ...cleanupOptions,
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onCommandSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -375,7 +403,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             command: "%" + new_search + "%",
                 ...cleanupOptions,
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onHostSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -391,7 +419,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             host: "%" + new_search + "%",
                 ...cleanupOptions
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onTypeSearch = ({search, offset}) => {
         //snackActions.info("Searching...", {persist:true});
@@ -407,7 +435,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             type: "%" + new_search + "%",
                 ...cleanupOptions
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onTaskSearch = ({search, offset}) => {
         if(search === ""){
@@ -423,7 +451,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             task_id: parseInt(search),
                 ...cleanupOptions
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onCallbackSearch = ({search, offset}) => {
         if(search === ""){
@@ -439,7 +467,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             callback_id: search,
                 ...cleanupOptions
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onOperatorSearch = ({search, offset}) => {
         setSearch(search);
@@ -454,7 +482,7 @@ export const SearchTabArtifactsPanel = (props) =>{
             fetchLimit: fetchLimit,
             username: "%" + new_search + "%",
                 ...cleanupOptions
-        }})
+        }}).then(({data}) => handleCallbackSearchResults(data)).catch(({data}) => handleCallbackSearchFailure(data))
     }
     const onChangePage = (event, value) => {
         switch(searchField){

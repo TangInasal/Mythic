@@ -363,15 +363,9 @@ export const NonInteractiveResponseDisplayConsole = (props) => {
     fetchPolicy: "network_only",
     onData: subscriptionDataCallback
   });
-  const onSubmitSearch = React.useCallback( (newSearch) => {
-    snackActions.warning("Search not supported for console view");
-  }, []);
 
   return (
       <React.Fragment>
-        {props.searchOutput &&
-            <SearchBar onSubmitSearch={onSubmitSearch}/>
-        }
         <div style={{overflowY: "auto", width: "100%", height: props.expand ? "100%" : undefined}}
              ref={props.responseRef}>
           <ResponseDisplayComponent rawResponses={rawResponses} viewBrowserScript={props.viewBrowserScript}
@@ -551,35 +545,35 @@ const ResponseDisplayComponent = ({rawResponses, viewBrowserScript, output, comm
           {browserScriptData?.screenshot?.map( (scr, index) => (
               <ResponseDisplayScreenshot key={"screenshot" + index + 'fortask' + task.id} task={task} {...scr}
                                          displayType={displayType} expand={expand} />
-            )) || null
+            ))
           }
           {browserScriptData?.plaintext !== undefined &&
             <ResponseDisplayPlaintext plaintext={browserScriptData["plaintext"]} task={task}
                                       expand={expand} displayType={displayType} />
           }
-          {browserScriptData?.table?.map( (table, index) => {
+          {browserScriptData?.table?.map( (table, index) => (
 
-            return <ResponseDisplayTable callback_id={task.callback_id} task={task} expand={expand}
+            <ResponseDisplayTable callback_id={task.callback_id} task={task} expand={expand}
                                          table={table} key={"tablefortask" + task.id + "table" + index}
                                          displayType={displayType}
             />
-          }) || null
+          ))
           }
           {browserScriptData?.download?.map( (dl, index) => (
               <ResponseDisplayDownload download={dl} task={task} displayType={displayType}
                                        key={"download" + index + "fortask" + task.id} />
-            )) || null
+            ))
           }
           {browserScriptData?.search?.map( (s, index) => (
               <ResponseDisplaySearch search={s} task={task} displayType={displayType}
                                      key={"searchlink" + index + "fortask" + task.id} />
-          )) || null
+          ))
           }
           {browserScriptData?.media?.map( (s, index) => (
               <ResponseDisplayMedia key={"searchmedia" + index + "fortask" + task.id}
                                     displayType={displayType}
                                     task={task} media={s} expand={expand} />
-          )) || null}
+          ))}
           {browserScriptData?.graph !== undefined &&
             <ResponseDisplayGraph graph={browserScriptData.graph} task={task}
                                   expand={expand} displayType={displayType} />

@@ -3,11 +3,25 @@ import {restartWebsockets} from "./index";
 import {snackActions} from "./components/utilities/Snackbar";
 
 export const meState = makeVar({loggedIn:false, user: null, access_token: null, refresh_token: null});
-export const menuOpen = makeVar(false);
 export const alertCount = makeVar(0);
+export const taskTimestampDisplayFieldOptions = [
+    {
+        name: "timestamp",
+        display: "Latest Timestamp for anything task related"
+    },
+    {
+        name: "status_timestamp_preprocessing",
+        display: "When Operator Submitted Task"
+    },
+    {
+        name: "status_timestamp_processing",
+        display: "When Agent Picked up Task",
+    }
+]
 export const operatorSettingDefaults =  {
     fontSize: 12,
-    fontFamily: "Verdana",
+    navBarOpen: false,
+    fontFamily: "Verdana, Arial, sans-serif",
     showMedia: true,
     hideUsernames: false,
     showIP: false,
@@ -15,21 +29,24 @@ export const operatorSettingDefaults =  {
     showCallbackGroups: false,
     useDisplayParamsForCLIHistory: true,
     interactType: "interact",
+    taskTimestampDisplayField: "timestamp",
     callbacks_table_columns: ["Interact", "Host", "Domain", "User", "Description", "Last Checkin", "Agent",  "IP", "PID"],
     callbacks_table_filters: {},
     autoTaskLsOnEmptyDirectories: false,
+    hideBrowserTasking: false,
+    hideTaskingContext: false,
     ["experiment-responseStreamLimit"]: 50,
     palette: {
         primary: {
-            dark: "#465b73",
+            dark: "#75859b",
             light: "#75859b",
         },
         error: {
-            dark: '#da3237',
+            dark: '#bd5142',
             light: '#c42c32'
         },
         success: {
-            dark: '#44b636',
+            dark: '#85b089',
             light: '#0e7004',
         },
         secondary: {
@@ -37,19 +54,19 @@ export const operatorSettingDefaults =  {
             light: '#a6a5a5'
         },
         info: {
-            dark: '#2184d3',
+            dark: '#84b4dc',
             light: '#4990b2'
         },
         warning: {
-            dark: "#f57c00",
+            dark: "#dc8455",
             light: "#ffb74d",
         },
         background: {
-            dark: '#303030',
+            dark: '#282828',
             light: '#f6f6f6'
         },
         paper: {
-            dark: '#424242',
+            dark: '#282828',
             light: '#ececec'
         },
         tableHeader: {
@@ -61,11 +78,11 @@ export const operatorSettingDefaults =  {
             light: "#e8e8e8",
         },
         pageHeader: {
-            dark: '#706c6e',
+            dark: '#1b2025',
             light: '#706c6e'
         },
         text: {
-            dark: "#ffffff",
+            dark: "#e4e4e4",
             light: "#000000",
         },
         selectedCallbackColor: {
@@ -89,22 +106,45 @@ export const operatorSettingDefaults =  {
             light: '#ffffff'
         },
         navBarColor: {
-            dark: "#3c4d67",
+            dark: "#2e373c",
             light: "#3c4d67",
-        }
+        },
+        taskPromptTextColor: {
+            dark: '#bebebe',
+            light: '#a6a5a5'
+        },
+        taskPromptCommandTextColor: {
+            dark: "#e4e4e4",
+            light: "#000000",
+        },
+        taskContextCwdColor: {
+            dark: "#122848",
+            light: "#acc0da",
+        },
+        taskContextImpersonationColor: {
+            dark: "#641616",
+            light: "#dec0c0",
+        },
+        taskContextExtraColor: {
+            dark: "#2a5953",
+            light: "#a7ce9d",
+        },
     },
 }
+export const defaultShortcuts = [
+    "ActiveCallbacks", "Payloads", "PayloadTypesAndC2",
+    "Operations", "SearchFiles", "SearchProxies",
+     "Reporting", "Eventing",
+].sort();
 export const mePreferences = makeVar(operatorSettingDefaults);
 
 
 export const successfulLogin = (data) => {
     localStorage.setItem("access_token", data.access_token);
     localStorage.setItem("refresh_token", data.refresh_token);
-
-
     let now = new Date();
     let serverNow = new Date(data.user.current_utc_time);
-    const difference = (serverNow.getTime() - now.getTime()) / 1000;
+    const difference = (serverNow.getTime() - now.getTime());
     let me = {...data.user};
     me.server_skew = difference;
     me.login_time = now;
@@ -124,7 +164,7 @@ export const successfulRefresh = (data) => {
     localStorage.setItem("refresh_token", data.refresh_token);
     let now = new Date();
     let serverNow = new Date(data.user.current_utc_time);
-    const difference = (serverNow.getTime() - now.getTime()) / 1000;
+    const difference = (serverNow.getTime() - now.getTime()) ;
     let me = {...meState().user};
     me.server_skew = difference;
     me.login_time = now;
@@ -138,7 +178,7 @@ export const successfulRefresh = (data) => {
     });
     localStorage.setItem("user", JSON.stringify(me));
 }
-export const FailedRefresh = () =>{
+export const FailedRefresh = (restart_websockets) =>{
     console.log("failed refresh");
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
@@ -157,6 +197,9 @@ export const FailedRefresh = () =>{
     });
     mePreferences(operatorSettingDefaults);
     snackActions.clearAll();
-    restartWebsockets();
+    if(restart_websockets){
+        restartWebsockets();
+    }
+
 }
 
